@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 400" width="100%" height="100%">
+  <defs>
+    <!-- Floor Radial Contact Shadow -->
+    <radialGradient id="tireFloorShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#94A3B8" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#CBD5E1" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#F8FAFC" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Soft Light Grey Rubber Carcass Gradients -->
+    <linearGradient id="lightTreadGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F1F5F9"/>
+      <stop offset="25%" stop-color="#E2E8F0"/>
+      <stop offset="65%" stop-color="#CBD5E1"/>
+      <stop offset="100%" stop-color="#94A3B8"/>
+    </linearGradient>
+
+    <linearGradient id="grooveDark" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#94A3B8"/>
+      <stop offset="50%" stop-color="#B8C4D0"/>
+      <stop offset="100%" stop-color="#D1D5DB"/>
+    </linearGradient>
+
+    <linearGradient id="sidewallShade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="30%" stop-color="#E2E8F0"/>
+      <stop offset="70%" stop-color="#CBD5E1"/>
+      <stop offset="100%" stop-color="#94A3B8"/>
+    </linearGradient>
+
+    <!-- Alloy Rim White/Silver Bright Gradients -->
+    <linearGradient id="rimSilver" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#F8FAFC"/>
+      <stop offset="80%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#CBD5E1"/>
+    </linearGradient>
+
+    <linearGradient id="spokeShadow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CBD5E1"/>
+      <stop offset="100%" stop-color="#94A3B8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ground Contact Shadow -->
+  <ellipse cx="160" cy="358" rx="105" ry="18" fill="url(#tireFloorShadow)"/>
+
+  <!-- TIRE BODY (Light Studio Grey 3/4 View) -->
+  <g transform="translate(0, -5)">
+
+    <!-- 1. Tire Back Curve (Depth Outer Silhouette) -->
+    <path d="M 115 32 
+             C 190 32 285 85 285 195 
+             C 285 300 190 350 115 350 
+             C 65 350 32 300 32 195 
+             C 32 90 65 32 115 32 Z" fill="#94A3B8"/>
+
+    <!-- 2. Front Tread Surface Arc -->
+    <path d="M 98 34 
+             C 52 48 30 100 30 195 
+             C 30 288 56 338 102 348 
+             C 72 335 48 278 48 195 
+             C 48 112 72 52 98 34 Z" fill="url(#lightTreadGrad)"/>
+
+    <!-- Left Tread Shoulder Horizontal Blocks (Notches along left tread edge) -->
+    <g stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" opacity="0.8">
+      <line x1="38" y1="88" x2="52" y2="92"/>
+      <line x1="34" y1="112" x2="48" y2="115"/>
+      <line x1="31" y1="138" x2="45" y2="140"/>
+      <line x1="30" y1="165" x2="44" y2="166"/>
+      <line x1="30" y1="192" x2="44" y2="192"/>
+      <line x1="31" y1="219" x2="45" y2="218"/>
+      <line x1="34" y1="245" x2="48" y2="243"/>
+      <line x1="39" y1="270" x2="53" y2="266"/>
+      <line x1="48" y1="295" x2="62" y2="288"/>
+      <line x1="62" y1="318" x2="76" y2="308"/>
+    </g>
+
+    <!-- Inner Tread Shoulder Horizontal Notches -->
+    <g stroke="#94A3B8" stroke-width="2" stroke-linecap="round" opacity="0.6">
+      <line x1="102" y1="48" x2="116" y2="44"/>
+      <line x1="90" y1="72" x2="105" y2="68"/>
+      <line x1="82" y1="100" x2="98" y2="96"/>
+      <line x1="76" y1="130" x2="92" y2="127"/>
+      <line x1="73" y1="160" x2="90" y2="158"/>
+      <line x1="73" y1="190" x2="90" y2="189"/>
+      <line x1="75" y1="220" x2="92" y2="219"/>
+      <line x1="80" y1="250" x2="97" y2="248"/>
+      <line x1="88" y1="280" x2="105" y2="276"/>
+      <line x1="102" y1="308" x2="118" y2="302"/>
+      <line x1="120" y1="330" x2="135" y2="322"/>
+    </g>
+
+    <!-- 3 Circumferential Main Tread Grooves (Vertical channels) -->
+    <!-- Groove 1 (Outer Left) -->
+    <path d="M 58 68 C 47 115 45 160 46 210 C 48 245 56 280 72 312" fill="none" stroke="url(#grooveDark)" stroke-width="4.5"/>
+    <!-- Groove 2 (Middle) -->
+    <path d="M 78 52 C 64 105 60 160 62 210 C 64 252 74 290 92 328" fill="none" stroke="url(#grooveDark)" stroke-width="4.5"/>
+    <!-- Groove 3 (Inner Right) -->
+    <path d="M 98 42 C 82 98 78 158 80 210 C 82 258 95 300 115 338" fill="none" stroke="url(#grooveDark)" stroke-width="4.5"/>
+
+    <!-- Subtle Tread Surface Highlight Lines -->
+    <path d="M 68 58 C 55 110 52 160 54 210 C 56 248 65 285 82 320" fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity="0.6"/>
+
+    <!-- 3. Tire Sidewall Face (Large Oval Base) -->
+    <ellipse cx="178" cy="192" rx="100" ry="152" fill="url(#sidewallShade)"/>
+    
+    <!-- Sidewall Molding Rings & Subtle Grooves -->
+    <ellipse cx="178" cy="192" rx="97" ry="147" fill="none" stroke="#CBD5E1" stroke-width="1.5"/>
+    <ellipse cx="178" cy="192" rx="88" ry="133" fill="none" stroke="#94A3B8" stroke-width="2" opacity="0.6"/>
+    <ellipse cx="178" cy="192" rx="84" ry="128" fill="none" stroke="#E2E8F0" stroke-width="1" opacity="0.8"/>
+
+    <!-- 4. Inner Rim Well & Bead Seat -->
+    <ellipse cx="188" cy="192" rx="72" ry="110" fill="#CBD5E1"/>
+    <ellipse cx="188" cy="192" rx="68" ry="104" fill="url(#spokeShadow)"/>
+
+    <!-- 5. ALLOY RIM (White/Silver 5-Twin Spoke Design) -->
+    <!-- Outer Rim Lip Flange -->
+    <ellipse cx="188" cy="192" rx="66" ry="100" fill="none" stroke="url(#rimSilver)" stroke-width="4"/>
+    <ellipse cx="188" cy="192" rx="63" ry="96" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+
+    <!-- ALLOY SPOKES (Centered at 188, 192) -->
+    <g transform="translate(188, 192)">
+
+      <!-- Center Hub Structure -->
+      <ellipse cx="0" cy="0" rx="20" ry="30" fill="url(#rimSilver)"/>
+      <ellipse cx="0" cy="0" rx="16" ry="24" fill="url(#spokeShadow)"/>
+      <ellipse cx="0" cy="0" rx="10" ry="15" fill="#E2E8F0"/>
+
+      <!-- Lug Nut Holes (5 holes in hub) -->
+      <ellipse cx="-8" cy="-8" rx="2.5" ry="3.5" fill="#94A3B8"/>
+      <ellipse cx="8" cy="-8" rx="2.5" ry="3.5" fill="#94A3B8"/>
+      <ellipse cx="10" cy="6" rx="2.5" ry="3.5" fill="#94A3B8"/>
+      <ellipse cx="0" cy="12" rx="2.5" ry="3.5" fill="#94A3B8"/>
+      <ellipse cx="-10" cy="6" rx="2.5" ry="3.5" fill="#94A3B8"/>
+
+      <!-- 5 DOUBLE / SPLIT SPOKES (Matching uploaded image) -->
+      <!-- Spoke Group 1 (Top / Vertical Up) -->
+      <path d="M -6 -20 L -12 -88 L -3 -92 L -1 -22 Z" fill="url(#rimSilver)"/>
+      <path d="M 1 -22 L 3 -92 L 12 -88 L 6 -20 Z" fill="url(#rimSilver)"/>
+
+      <!-- Spoke Group 2 (Top Right) -->
+      <path d="M 12 -12 L 56 -52 L 62 -42 L 16 -5 Z" fill="url(#rimSilver)"/>
+      <path d="M 16 -2 L 62 -38 L 66 -28 L 18 5 Z" fill="url(#rimSilver)"/>
+
+      <!-- Spoke Group 3 (Bottom Right) -->
+      <path d="M 14 10 L 60 48 L 54 58 L 10 16 Z" fill="url(#rimSilver)"/>
+      <path d="M 8 18 L 50 62 L 42 70 L 4 22 Z" fill="url(#rimSilver)"/>
+
+      <!-- Spoke Group 4 (Bottom Left) -->
+      <path d="M -6 22 L -42 70 L -50 62 L -10 18 Z" fill="url(#rimSilver)"/>
+      <path d="M -12 16 L -54 58 L -60 48 L -14 10 Z" fill="url(#rimSilver)"/>
+
+      <!-- Spoke Group 5 (Top Left) -->
+      <path d="M -18 5 L -66 -28 L -62 -38 L -16 -2 Z" fill="url(#rimSilver)"/>
+      <path d="M -16 -5 L -62 -42 L -56 -52 L -12 -12 Z" fill="url(#rimSilver)"/>
+
+    </g>
+
+    <!-- Rim Highlights -->
+    <ellipse cx="188" cy="192" rx="65" ry="98" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.8" stroke-dasharray="30 90"/>
+  </g>
+</svg>

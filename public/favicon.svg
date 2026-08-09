@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Solid Red Background Canvas -->
+  <rect width="512" height="512" rx="96" fill="#E10600"/>
+
+  <g fill="#FFFFFF">
+    <!-- 8-Teeth Gear Cog Outer Ring -->
+    <path fill-rule="evenodd" clip-rule="evenodd" d="
+      M 232 46 L 280 46 L 284 82 C 304 86 323 94 340 104 L 368 80 L 402 114 L 378 142 C 388 159 396 178 400 198 L 436 202 L 436 250 L 436 262 L 400 266 C 396 286 388 305 378 322 L 402 350 L 368 384 L 340 360 C 323 370 304 378 284 382 L 280 418 L 232 418 L 228 382 C 208 378 189 370 172 360 L 144 384 L 110 350 L 134 322 C 124 305 116 286 112 266 L 76 262 L 76 250 L 76 202 L 112 198 C 116 178 124 159 134 142 L 110 114 L 144 80 L 172 104 C 189 94 208 86 228 82 Z
+      M 256 148
+      A 108 108 0 1 0 256 364
+      A 108 108 0 1 0 256 148 Z" 
+    />
+
+    <!-- Inner Concentric White Ring -->
+    <path fill-rule="evenodd" clip-rule="evenodd" d="
+      M 256 162
+      A 94 94 0 1 0 256 350
+      A 94 94 0 1 0 256 162 Z
+      M 256 178
+      A 78 78 0 1 1 256 334
+      A 78 78 0 1 1 256 178 Z"
+    />
+
+    <!-- Center 3D Angled Tire Graphic -->
+    <!-- Left Tire Tread Body & Shoulder -->
+    <path d="
+      M 235 192
+      C 192 198 165 224 165 256
+      C 165 288 192 314 235 320
+      C 212 300 198 280 198 256
+      C 198 232 212 212 235 192 Z"
+    />
+
+    <!-- Chevron Tread Notches on Left Arc -->
+    <path d="M 186 214 L 214 224 L 208 236 L 178 225 Z" />
+    <path d="M 174 238 L 208 247 L 204 260 L 168 250 Z" />
+    <path d="M 168 262 L 204 270 L 200 283 L 167 274 Z" />
+    <path d="M 172 286 L 207 293 L 202 305 L 170 298 Z" />
+    <path d="M 184 309 L 214 314 L 208 325 L 177 320 Z" />
+
+    <!-- Wheel Rim Oval (Right Side of Tire) -->
+    <path fill-rule="evenodd" clip-rule="evenodd" d="
+      M 276 195
+      C 298 195 316 222 316 256
+      C 316 290 298 317 276 317
+      C 254 317 236 290 236 256
+      C 236 222 254 195 276 195 Z
+      M 276 210
+      C 263 210 252 231 252 256
+      C 252 281 263 302 276 302
+      C 289 302 300 281 300 256
+      C 300 231 289 210 276 210 Z"
+    />
+  </g>
+</svg>
