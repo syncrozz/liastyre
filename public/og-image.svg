@@ -1,0 +1,281 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="redBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E10600"/>
+      <stop offset="100%" stop-color="#B80000"/>
+    </linearGradient>
+
+    <linearGradient id="darkRedGlass" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#800000" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#500000" stop-opacity="0.7"/>
+    </linearGradient>
+
+    <linearGradient id="tabletBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <!-- Drop Shadows -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#E10600" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Left Main Background (Red Canvas) -->
+  <rect width="1200" height="630" fill="url(#redBg)"/>
+
+  <!-- Subtle Tire Tread Background Watermark (Pattern) -->
+  <g opacity="0.08" fill="#FFFFFF">
+    <path d="M -50 100 Q 150 200 350 100 Q 550 0 750 100" stroke="#FFFFFF" stroke-width="40" fill="none" stroke-dasharray="20 15"/>
+    <path d="M -50 250 Q 150 350 350 250 Q 550 150 750 250" stroke="#FFFFFF" stroke-width="40" fill="none" stroke-dasharray="20 15"/>
+    <path d="M -50 400 Q 150 500 350 400 Q 550 300 750 400" stroke="#FFFFFF" stroke-width="40" fill="none" stroke-dasharray="20 15"/>
+  </g>
+
+  <!-- LEFT SECTION CONTENT -->
+  <g transform="translate(40, 40)">
+    <!-- Logo & Branding Header -->
+    <g transform="translate(0, 0)">
+      <!-- Tyre Directory Vector Mark -->
+      <g transform="translate(0, 0) scale(0.65)">
+        <rect width="160" height="160" rx="32" fill="#E10600" filter="url(#softGlow)"/>
+        <g fill="#FFFFFF">
+          <!-- Tread Arc -->
+          <path d="M 54 27 C 35 37 21 58 19 80 C 18 102 30 125 54 133 C 47 122 43 106 42 80 C 41 54 48 38 54 27 Z" opacity="0.95"/>
+          <path d="M 29 54 L 45 60 L 41 67 L 24 61 Z"/>
+          <path d="M 23 70 L 41 76 L 38 84 L 21 78 Z"/>
+          <path d="M 21 87 L 39 92 L 37 100 L 20 94 Z"/>
+          <!-- Gear & Magnifier -->
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M 96 32 L 106 32 L 107 42 A 45 45 0 0 1 123 48 L 132 42 L 139 50 L 134 58 A 45 45 0 0 1 140 74 L 150 76 L 150 86 L 140 87 A 45 45 0 0 1 134 103 L 139 112 L 132 119 L 123 114 A 45 45 0 0 1 107 120 L 106 130 L 96 130 L 94 120 A 45 45 0 0 1 78 114 L 70 119 L 62 112 L 68 103 A 45 45 0 0 1 62 87 L 52 86 L 52 76 L 62 74 A 45 45 0 0 1 68 58 L 62 50 L 70 42 L 78 48 A 45 45 0 0 1 94 42 Z M 101 54 A 26 26 0 1 0 101 107 A 26 26 0 1 0 101 54 Z"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M 101 59 A 18 18 0 1 0 101 95 A 18 18 0 1 0 101 59 Z M 101 66 A 11 11 0 1 1 101 88 A 11 11 0 1 1 101 66 Z"/>
+          <path d="M 110 86 L 125 101 C 127 103 127 107 125 110 C 122 112 118 112 116 110 L 102 95 Z"/>
+        </g>
+      </g>
+
+      <!-- Brand Title -->
+      <g transform="translate(120, 10)">
+        <text x="0" y="38" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="44" fill="#FFFFFF" letter-spacing="-1">TYRE</text>
+        <text x="0" y="82" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="44" fill="#0F172A" letter-spacing="-1">DIRECTORY</text>
+        <!-- PRO Badge -->
+        <rect x="235" y="10" width="56" height="28" rx="6" fill="#0F172A"/>
+        <text x="263" y="29" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#FFFFFF" text-anchor="middle">PRO</text>
+      </g>
+    </g>
+
+    <!-- Subtitle Tagline -->
+    <text x="0" y="145" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="22" fill="#FFFFFF" letter-spacing="-0.5">
+      Sistem Pengurusan &amp; Direktori Tayar
+    </text>
+
+    <line x1="0" y1="162" x2="70" y2="162" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- Paragraph Description -->
+    <text x="0" y="195" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="15" fill="#FFE5E5">
+      Cari tayar yang tepat, cepat dan pintar
+    </text>
+    <text x="0" y="217" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="15" fill="#FFE5E5">
+      mengikut saiz, jenama, kategori dan ciri.
+    </text>
+
+    <!-- 4 Grid Feature Cards -->
+    <g transform="translate(0, 245)">
+      <!-- Card 1: Smart Search -->
+      <g transform="translate(0, 0)">
+        <rect width="235" height="85" rx="14" fill="url(#darkRedGlass)" stroke="#FF6666" stroke-width="1" stroke-opacity="0.3"/>
+        <circle cx="32" cy="42" r="18" fill="#B80000" stroke="#FF6666" stroke-width="1.5"/>
+        <!-- Search Icon -->
+        <path d="M 28 38 A 5 5 0 1 0 36 46 A 5 5 0 1 0 28 38 M 34 44 L 39 49" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <text x="60" y="32" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="14" fill="#FFFFFF">Smart Search</text>
+        <text x="60" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">Cari tayar mengikut saiz,</text>
+        <text x="60" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">jenama, kategori &amp; ciri.</text>
+      </g>
+
+      <!-- Card 2: Padanan Kenderaan -->
+      <g transform="translate(250, 0)">
+        <rect width="235" height="85" rx="14" fill="url(#darkRedGlass)" stroke="#FF6666" stroke-width="1" stroke-opacity="0.3"/>
+        <circle cx="32" cy="42" r="18" fill="#B80000" stroke="#FF6666" stroke-width="1.5"/>
+        <!-- Car Icon -->
+        <path d="M 23 45 L 25 38 C 26 36 28 35 30 35 L 34 35 C 36 35 38 36 39 38 L 41 45 M 21 45 L 43 45 C 44 45 45 46 45 47 L 45 50 C 45 51 44 52 43 52 L 21 52 C 20 52 19 51 19 50 L 19 47 C 19 46 20 45 21 45 Z" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <text x="60" y="32" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="14" fill="#FFFFFF">Padanan Kenderaan</text>
+        <text x="60" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">Dapatkan cadangan tayar</text>
+        <text x="60" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">sesuai kenderaan anda.</text>
+      </g>
+
+      <!-- Card 3: Data Terpercaya -->
+      <g transform="translate(0, 95)">
+        <rect width="235" height="85" rx="14" fill="url(#darkRedGlass)" stroke="#FF6666" stroke-width="1" stroke-opacity="0.3"/>
+        <circle cx="32" cy="42" r="18" fill="#B80000" stroke="#FF6666" stroke-width="1.5"/>
+        <!-- Shield Check Icon -->
+        <path d="M 32 33 L 40 36 V 42 C 40 47 36 51 32 53 C 28 51 24 47 24 42 V 36 L 32 33 Z M 28 43 L 31 46 L 36 40" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <text x="60" y="32" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="14" fill="#FFFFFF">Data Terpercaya</text>
+        <text x="60" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">Maklumat tepat &amp; dikemas</text>
+        <text x="60" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">kini untuk pilihan terbaik.</text>
+      </g>
+
+      <!-- Card 4: Pengurusan Pintar -->
+      <g transform="translate(250, 95)">
+        <rect width="235" height="85" rx="14" fill="url(#darkRedGlass)" stroke="#FF6666" stroke-width="1" stroke-opacity="0.3"/>
+        <circle cx="32" cy="42" r="18" fill="#B80000" stroke="#FF6666" stroke-width="1.5"/>
+        <!-- Layers Icon -->
+        <path d="M 32 33 L 41 37 L 32 41 L 23 37 Z M 23 42 L 32 46 L 41 42 M 23 47 L 32 51 L 41 47" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <text x="60" y="32" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="14" fill="#FFFFFF">Pengurusan Pintar</text>
+        <text x="60" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">Sistem pengurusan inventori</text>
+        <text x="60" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#FFCCCC">&amp; direktori tersusun.</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- RIGHT SECTION: TABLET DEVICE MOCKUP -->
+  <g transform="translate(520, 30)" filter="url(#shadow)">
+    <!-- Outer Tablet Frame -->
+    <rect width="640" height="495" rx="28" fill="url(#tabletBorder)" stroke="#475569" stroke-width="3"/>
+    <rect x="8" y="8" width="624" height="479" rx="20" fill="#0F172A"/>
+
+    <!-- App Header Bar inside Tablet -->
+    <rect x="8" y="8" width="624" height="48" fill="#1E293B"/>
+    <circle cx="28" cy="32" r="5" fill="#EF4444"/>
+    <circle cx="44" cy="32" r="5" fill="#F59E0B"/>
+    <circle cx="60" cy="32" r="5" fill="#10B981"/>
+
+    <!-- App Logo inside Tablet Header -->
+    <rect x="85" y="18" width="28" height="28" rx="6" fill="#E10600"/>
+    <!-- Tiny Gear Icon -->
+    <circle cx="99" cy="32" r="6" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+    <text x="120" y="37" font-family="system-ui, sans-serif" font-weight="900" font-size="15" fill="#FFFFFF">TYRE <tspan fill="#EF4444">DIRECTORY</tspan></text>
+
+    <!-- Nav Pills in App -->
+    <rect x="280" y="18" width="105" height="28" rx="14" fill="#E10600"/>
+    <text x="332" y="36" font-family="system-ui, sans-serif" font-weight="700" font-size="11" fill="#FFFFFF" text-anchor="middle">🔍 Smart Search</text>
+
+    <text x="430" y="36" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">Padanan Kenderaan</text>
+    <text x="530" y="36" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">Jenama</text>
+
+    <!-- App Main Body (Light Canvas) -->
+    <rect x="8" y="56" width="624" height="431" fill="#F8FAFC"/>
+
+    <!-- App Search Title Section -->
+    <text x="28" y="85" font-family="system-ui, sans-serif" font-weight="900" font-size="18" fill="#0F172A">🔍 Smart Product Directory</text>
+    <text x="28" y="103" font-family="system-ui, sans-serif" font-size="11" fill="#64748B">Taip sebarang saiz (cth: <tspan fill="#E10600" font-weight="700">205/55R16</tspan>), jenama (<tspan font-weight="700" fill="#0F172A">Michelin</tspan>), atau ciri (<tspan font-weight="700" fill="#0F172A">Wet Grip</tspan>)</text>
+
+    <!-- Search Input Box -->
+    <rect x="28" y="115" width="584" height="38" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+    <text x="45" y="139" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">🔍  Taip carian cth: 205/55R16, Michelin, Primacy, Wet Grip, SUV...</text>
+
+    <!-- Popular Chips -->
+    <text x="28" y="172" font-family="system-ui, sans-serif" font-weight="700" font-size="10" fill="#64748B">Carian Popular:</text>
+    <rect x="100" y="160" width="68" height="18" rx="4" fill="#E2E8F0"/><text x="134" y="173" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#334155" text-anchor="middle">205/55R16</text>
+    <rect x="174" y="160" width="68" height="18" rx="4" fill="#E2E8F0"/><text x="208" y="173" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#334155" text-anchor="middle">195/55R15</text>
+    <rect x="248" y="160" width="68" height="18" rx="4" fill="#E2E8F0"/><text x="282" y="173" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#334155" text-anchor="middle">175/65R14</text>
+
+    <!-- 2 Tire Product Cards in Grid -->
+    <!-- Card 1 -->
+    <g transform="translate(28, 190)">
+      <rect width="282" height="280" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)"/>
+      <rect x="12" y="12" width="90" height="24" rx="6" fill="#002855"/>
+      <text x="57" y="28" font-family="system-ui, sans-serif" font-weight="900" font-size="10" fill="#FFCC00" text-anchor="middle">GOODYEAR</text>
+
+      <rect x="200" y="12" width="70" height="22" rx="6" fill="#F1F5F9"/>
+      <text x="235" y="27" font-family="system-ui, sans-serif" font-weight="800" font-size="10" fill="#0F172A" text-anchor="middle">205/55R16</text>
+
+      <text x="12" y="52" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#0F172A">GOODYEAR AMG 2026</text>
+      <text x="12" y="66" font-family="system-ui, sans-serif" font-size="10" fill="#64748B">Passenger • Bunga 8.4mm (2026)</text>
+
+      <!-- Rating Specs Box -->
+      <rect x="12" y="78" width="258" height="120" rx="10" fill="#F8FAFC"/>
+      <text x="22" y="96" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#94A3B8">CENGKAMAN BASAH</text>
+      <text x="22" y="112" font-family="system-ui, sans-serif" font-size="12" font-weight="900" fill="#059669">Gred A</text>
+
+      <text x="22" y="132" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#94A3B8">PENJIMATAN MINYAK</text>
+      <text x="22" y="148" font-family="system-ui, sans-serif" font-size="12" font-weight="900" fill="#2563EB">Gred B</text>
+
+      <!-- Tire Render Graphic -->
+      <circle cx="210" cy="138" r="42" fill="#1E293B"/>
+      <circle cx="210" cy="138" r="24" fill="#94A3B8"/>
+      <circle cx="210" cy="138" r="14" fill="#475569"/>
+
+      <text x="12" y="215" font-family="system-ui, sans-serif" font-size="9" font-weight="800" fill="#64748B">HARGA PASARAN</text>
+      <text x="12" y="235" font-family="system-ui, sans-serif" font-size="18" font-weight="900" fill="#DC2626">RM 353</text>
+
+      <rect x="12" y="245" width="258" height="26" rx="8" fill="#0F172A"/>
+      <text x="141" y="262" font-family="system-ui, sans-serif" font-size="10" font-weight="800" fill="#FFFFFF" text-anchor="middle">👁  Lihat Detail &amp; Bunga Tayar</text>
+    </g>
+
+    <!-- Card 2 -->
+    <g transform="translate(320, 190)">
+      <rect width="282" height="280" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)"/>
+      <rect x="12" y="12" width="90" height="24" rx="6" fill="#002855"/>
+      <text x="57" y="28" font-family="system-ui, sans-serif" font-weight="900" font-size="10" fill="#FFCC00" text-anchor="middle">GOODYEAR</text>
+
+      <rect x="200" y="12" width="70" height="22" rx="6" fill="#F1F5F9"/>
+      <text x="235" y="27" font-family="system-ui, sans-serif" font-weight="800" font-size="10" fill="#0F172A" text-anchor="middle">195/55R15</text>
+
+      <text x="12" y="52" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#0F172A">GOODYEAR ADP2 2026</text>
+      <text x="12" y="66" font-family="system-ui, sans-serif" font-size="10" fill="#64748B">Passenger • Bunga 7.2mm (2026)</text>
+
+      <!-- Rating Specs Box -->
+      <rect x="12" y="78" width="258" height="120" rx="10" fill="#F8FAFC"/>
+      <text x="22" y="96" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#94A3B8">CENGKAMAN BASAH</text>
+      <text x="22" y="112" font-family="system-ui, sans-serif" font-size="12" font-weight="900" fill="#2563EB">Gred B</text>
+
+      <text x="22" y="132" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#94A3B8">PENJIMATAN MINYAK</text>
+      <text x="22" y="148" font-family="system-ui, sans-serif" font-size="12" font-weight="900" fill="#059669">Gred A</text>
+
+      <!-- Tire Render Graphic -->
+      <circle cx="210" cy="138" r="42" fill="#1E293B"/>
+      <circle cx="210" cy="138" r="24" fill="#94A3B8"/>
+      <circle cx="210" cy="138" r="14" fill="#475569"/>
+
+      <text x="12" y="215" font-family="system-ui, sans-serif" font-size="9" font-weight="800" fill="#64748B">HARGA PASARAN</text>
+      <text x="12" y="235" font-family="system-ui, sans-serif" font-size="18" font-weight="900" fill="#DC2626">RM 280</text>
+
+      <rect x="12" y="245" width="258" height="26" rx="8" fill="#0F172A"/>
+      <text x="141" y="262" font-family="system-ui, sans-serif" font-size="10" font-weight="800" fill="#FFFFFF" text-anchor="middle">👁  Lihat Detail &amp; Bunga Tayar</text>
+    </g>
+  </g>
+
+  <!-- BOTTOM MARKETING FOOTER BAR -->
+  <rect x="0" y="565" width="1200" height="65" fill="#8B0000"/>
+  <line x1="0" y1="565" x2="1200" y2="565" stroke="#FF4D4D" stroke-width="1.5"/>
+
+  <g transform="translate(40, 580)" fill="#FFFFFF" font-family="system-ui, sans-serif">
+    <!-- Item 1 -->
+    <g transform="translate(0, 0)">
+      <circle cx="16" cy="16" r="14" fill="#E10600"/>
+      <!-- Search Icon -->
+      <path d="M 12 12 A 4 4 0 1 0 18 18 M 16 16 L 20 20" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" fill="none"/>
+      <text x="38" y="14" font-weight="800" font-size="13">Cari Pantas</text>
+      <text x="38" y="28" font-size="10.5" fill="#FFCCCC">Jimat masa, cari tepat</text>
+    </g>
+
+    <!-- Item 2 -->
+    <g transform="translate(300, 0)">
+      <circle cx="16" cy="16" r="14" fill="#E10600"/>
+      <!-- Car Icon -->
+      <path d="M 10 18 L 11 14 C 12 13 13 12 14 12 L 18 12 C 19 12 20 13 21 14 L 22 18" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      <text x="38" y="14" font-weight="800" font-size="13">Padanan Tepat</text>
+      <text x="38" y="28" font-size="10.5" fill="#FFCCCC">Sesuai dengan kenderaan</text>
+    </g>
+
+    <!-- Item 3 -->
+    <g transform="translate(600, 0)">
+      <circle cx="16" cy="16" r="14" fill="#E10600"/>
+      <!-- Shield Icon -->
+      <path d="M 16 9 L 22 11 V 16 C 22 19 19 22 16 23 C 13 22 10 19 10 16 V 11 L 16 9 Z" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      <text x="38" y="14" font-weight="800" font-size="13">Selamat &amp; Terpercaya</text>
+      <text x="38" y="28" font-size="10.5" fill="#FFCCCC">Data sah &amp; dikemas kini</text>
+    </g>
+
+    <!-- Item 4 -->
+    <g transform="translate(900, 0)">
+      <circle cx="16" cy="16" r="14" fill="#E10600"/>
+      <!-- Chart Icon -->
+      <path d="M 10 22 L 14 17 L 18 19 L 22 11" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <text x="38" y="14" font-weight="800" font-size="13">Pengurusan Efisien</text>
+      <text x="38" y="28" font-size="10.5" fill="#FFCCCC">Inventori teratur &amp; efisien</text>
+    </g>
+  </g>
+</svg>

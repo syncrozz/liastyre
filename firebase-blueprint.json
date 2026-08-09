@@ -1,0 +1,33 @@
+{
+  "entities": {
+    "tyres": {
+      "title": "Tyres Inventory",
+      "description": "LIAS TYRE master inventory list",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "brand": { "type": "string" },
+        "pattern": { "type": "string" },
+        "size": { "type": "string" },
+        "width": { "type": "number" },
+        "ratio": { "type": "number" },
+        "rim": { "type": "number" },
+        "category": { "type": "string" },
+        "storeStock": { "type": "number" },
+        "totalStock": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "marketPrice": { "type": "number" },
+        "promoPrice": { "type": "number" },
+        "status": { "type": "string" },
+        "speedRating": { "type": "string" },
+        "loadIndex": { "type": "number" },
+        "origin": { "type": "string" },
+        "year": { "type": "number" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "image": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "brand", "pattern", "size", "storeStock", "marketPrice"]
+    }
+  }
+}
