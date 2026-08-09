@@ -17,11 +17,16 @@ import {
   ShieldAlert,
   LogOut,
   Cloud,
-  CloudCheck
+  CloudCheck,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  UserCheck,
+  UserX
 } from "lucide-react";
 import { NavTab, UserPersona } from "../types/tyre";
 import { TyreDirectoryLogo } from "./TyreDirectoryLogo";
-import { signInWithGoogle, logoutGoogle, onAuthStateChanged, auth, User } from "../lib/firebase";
+import { signInWithGoogle, logoutGoogle, onAuthStateChanged, auth, db, doc, setDoc, onSnapshot, User } from "../lib/firebase";
 
 interface NavbarHeaderProps {
   activeTab: NavTab;
@@ -31,6 +36,9 @@ interface NavbarHeaderProps {
   comparisonCount: number;
   quotationItemCount: number;
 }
+
+// Senarai E-mel Owner Asal (Default Whitelist)
+const DEFAULT_AUTHORIZED_OWNERS = ["khaikerr@gmail.com"];
 
 export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
   activeTab,
@@ -46,23 +54,62 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
+  // Whitelist Owner States
+  const [authorizedEmails, setAuthorizedEmails] = useState<string[]>(DEFAULT_AUTHORIZED_OWNERS);
+  const [unauthorizedModal, setUnauthorizedModal] = useState<{ show: boolean; email: string }>({ show: false, email: "" });
+  const [showOwnersModal, setShowOwnersModal] = useState<boolean>(false);
+  const [newOwnerEmailInput, setNewOwnerEmailInput] = useState<string>("");
+
+  // Sync Whitelisted Emails with Firestore
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setGoogleUser(user);
-      if (user) {
-        setPersona("Kedai Tayar");
+    const docRef = doc(db, "settings", "authorized_owners");
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (Array.isArray(data.emails) && data.emails.length > 0) {
+          setAuthorizedEmails(data.emails);
+        }
+      } else {
+        // Seed default
+        setDoc(docRef, { emails: DEFAULT_AUTHORIZED_OWNERS }).catch(console.error);
       }
     });
     return () => unsubscribe();
-  }, [setPersona]);
+  }, []);
+
+  // Helper check
+  const isAuthorizedOwner = (email: string | null | undefined): boolean => {
+    if (!email) return false;
+    return authorizedEmails.some((e) => e.trim().toLowerCase() === email.trim().toLowerCase());
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setGoogleUser(user);
+      if (user && user.email) {
+        if (isAuthorizedOwner(user.email)) {
+          setPersona("Kedai Tayar");
+        } else {
+          setPersona("Pemilik Kenderaan");
+          setUnauthorizedModal({ show: true, email: user.email });
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [setPersona, authorizedEmails]);
 
   const handleGoogleSignIn = async () => {
     try {
       setIsLoggingIn(true);
       const user = await signInWithGoogle();
-      if (user) {
-        setPersona("Kedai Tayar");
-        setShowPinModal(false);
+      if (user && user.email) {
+        if (isAuthorizedOwner(user.email)) {
+          setPersona("Kedai Tayar");
+          setShowPinModal(false);
+        } else {
+          setPersona("Pemilik Kenderaan");
+          setUnauthorizedModal({ show: true, email: user.email });
+        }
       }
     } catch (err) {
       console.error("Google sign-in error:", err);
@@ -73,6 +120,43 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
 
   const handleGoogleSignOut = async () => {
     await logoutGoogle();
+    setPersona("Pemilik Kenderaan");
+  };
+
+  const handleAddOwnerEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = newOwnerEmailInput.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) return;
+
+    if (authorizedEmails.includes(cleanEmail)) {
+      setNewOwnerEmailInput("");
+      return;
+    }
+
+    const updated = [...authorizedEmails, cleanEmail];
+    setAuthorizedEmails(updated);
+    setNewOwnerEmailInput("");
+
+    try {
+      await setDoc(doc(db, "settings", "authorized_owners"), { emails: updated });
+    } catch (err) {
+      console.error("Error updating authorized owners in Firestore:", err);
+    }
+  };
+
+  const handleRemoveOwnerEmail = async (emailToRemove: string) => {
+    if (authorizedEmails.length <= 1) {
+      alert("Sekurang-kurangnya 1 e-mel owner mestilah dikekalkan dalam senarai.");
+      return;
+    }
+    const updated = authorizedEmails.filter((e) => e.toLowerCase() !== emailToRemove.toLowerCase());
+    setAuthorizedEmails(updated);
+
+    try {
+      await setDoc(doc(db, "settings", "authorized_owners"), { emails: updated });
+    } catch (err) {
+      console.error("Error removing owner email from Firestore:", err);
+    }
   };
 
   const handleAdminAuth = (e?: React.FormEvent) => {
@@ -115,6 +199,15 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
                 <UserIcon className="w-3.5 h-3.5 text-amber-400" />
               )}
               <span className="font-bold truncate max-w-[150px]">{googleUser.displayName || googleUser.email}</span>
+              {isAuthorizedOwner(googleUser.email) && (
+                <button
+                  onClick={() => setShowOwnersModal(true)}
+                  className="bg-slate-700 hover:bg-slate-600 text-amber-300 text-[10px] px-1.5 py-0.5 rounded font-bold transition-all flex items-center gap-0.5"
+                  title="Urus Senarai E-mel Owner Dibenarkan"
+                >
+                  <UserCheck className="w-3 h-3 text-emerald-400" /> Whitelist
+                </button>
+              )}
               <button
                 onClick={handleGoogleSignOut}
                 className="text-slate-400 hover:text-rose-400 ml-1 font-bold"
@@ -313,6 +406,130 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Unauthorized User Attempt Modal */}
+      {unauthorizedModal.show && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-rose-500/30 text-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+            <button
+              onClick={() => setUnauthorizedModal({ show: false, email: "" })}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                <UserX className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Akses Admin Ditolak</h3>
+                <p className="text-xs text-rose-400 font-semibold truncate max-w-[260px]">
+                  {unauthorizedModal.email}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs text-slate-300 leading-relaxed">
+              <p className="font-semibold text-amber-300">
+                🔒 E-mel Google anda bukan pemilik/owner berdaftar Lias Tyre.
+              </p>
+              <p>
+                Sistem SaaS ini dilindungi dengan ketat. Hanya e-mel owner yang telah disahkan sahaja boleh mengakses data harga kos, margin untung, dan pengurusan stok Lias Tyre.
+              </p>
+              <p className="text-slate-400 text-[11px]">
+                Mod akaun anda dikekalkan sebagai <strong className="text-white">Pemilik Kenderaan (Customer/Pelanggan)</strong>.
+              </p>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setUnauthorizedModal({ show: false, email: "" })}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition-all shadow-md"
+              >
+                Faham & Teruskan Sebagai Pelanggan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Whitelisted Owner Emails Modal */}
+      {showOwnersModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative space-y-5">
+            <button
+              onClick={() => setShowOwnersModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Kawalan SaaS Owner (Whitelist)</h3>
+                <p className="text-xs text-slate-400">Tetapkan e-mel Google yang dibenarkan menjadi Owner Lias Tyre</p>
+              </div>
+            </div>
+
+            {/* Add email form */}
+            <form onSubmit={handleAddOwnerEmail} className="space-y-2">
+              <label className="block text-xs font-bold text-slate-300">Tambah E-mel Owner Baharu:</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={newOwnerEmailInput}
+                  onChange={(e) => setNewOwnerEmailInput(e.target.value)}
+                  placeholder="contoh: owner@liastyre.com"
+                  className="flex-1 bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                />
+                <button
+                  type="submit"
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Tambah
+                </button>
+              </div>
+            </form>
+
+            {/* Whitelisted Emails List */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-300">E-mel Owner Sah ({authorizedEmails.length}):</label>
+              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                {authorizedEmails.map((email) => (
+                  <div key={email} className="flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="font-mono text-slate-200">{email}</span>
+                      {googleUser?.email?.toLowerCase() === email.toLowerCase() && (
+                        <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
+                          Anda
+                        </span>
+                      )}
+                    </div>
+                    {authorizedEmails.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveOwnerEmail(email)}
+                        className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-slate-800 transition-colors"
+                        title="Padam E-mel dari Whitelist"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400">
+              💡 <strong>Nota SaaS:</strong> Hanya pengguna yang log masuk Google menggunakan e-mel dalam senarai ini akan diberi hak akses Admin Lias Tyre. Semua pengguna lain secara automatik adalah Pelanggan (Read-only).
+            </div>
           </div>
         </div>
       )}
