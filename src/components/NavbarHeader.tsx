@@ -48,33 +48,54 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
   comparisonCount,
   quotationItemCount,
 }) => {
-  const [showPinModal, setShowPinModal] = useState<boolean>(false);
-  const [pinInput, setPinInput] = useState<string>("");
-  const [pinError, setPinError] = useState<string>("");
-  const [googleUser, setGoogleUser] = useState<User | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
 
-  // Whitelist Owner States
-  const [authorizedEmails, setAuthorizedEmails] = useState<string[]>(DEFAULT_AUTHORIZED_OWNERS);
-  const [unauthorizedModal, setUnauthorizedModal] = useState<{ show: boolean; email: string }>({ show: false, email: "" });
-  const [showOwnersModal, setShowOwnersModal] = useState<boolean>(false);
-  const [newOwnerEmailInput, setNewOwnerEmailInput] = useState<string>("");
+  // Google Authentication
+  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Whitelist Owner
+  const [authorizedEmails, setAuthorizedEmails] = useState<string[]>(
+    DEFAULT_AUTHORIZED_OWNERS,
+  );
+
+  const [unauthorizedModal, setUnauthorizedModal] = useState<{
+    show: boolean;
+    email: string;
+  }>({
+    show: false,
+    email: "",
+  });
+
+  const [showOwnersModal, setShowOwnersModal] = useState(false);
+  const [newOwnerEmailInput, setNewOwnerEmailInput] = useState("");
 
   // Sync Whitelisted Emails with Firestore
   useEffect(() => {
     const docRef = doc(db, "settings", "authorized_owners");
+
     const unsubscribe = onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
+
         if (Array.isArray(data.emails) && data.emails.length > 0) {
           setAuthorizedEmails(data.emails);
         }
-      } else {
-        // Seed default
-        setDoc(docRef, { emails: DEFAULT_AUTHORIZED_OWNERS }).catch(console.error);
+
+        return;
       }
+
+      // Seed default whitelist
+      setDoc(docRef, {
+        emails: DEFAULT_AUTHORIZED_OWNERS,
+      }).catch((error) => {
+        console.error("Failed to seed authorized owners:", error);
+      });
     });
-    return () => unsubscribe();
+
+    return unsubscribe;
   }, []);
 
   // Helper check
