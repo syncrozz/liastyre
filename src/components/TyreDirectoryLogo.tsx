@@ -1,7 +1,7 @@
 import React from "react";
 
 export const OFFICIAL_TYRE_DIRECTORY_LOGO_URL =
-  "https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/TYRE_DIRECTORY_PWA_IconPack_2.0/android-chrome-192x192.png";
+  "https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/LiasTyre/android-chrome-192x192.png";
 
 interface TyreDirectoryLogoProps {
   className?: string;

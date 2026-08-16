@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BarChart3, Warehouse, DollarSign, TrendingUp, AlertTriangle, Plus, PackageCheck, Layers, RefreshCw, CheckCircle2, Sparkles, FolderSync, ShieldCheck, HelpCircle, FileSpreadsheet, UploadCloud, FileText } from "lucide-react";
+import { BarChart3, Warehouse, DollarSign, TrendingUp, AlertTriangle, Plus, PackageCheck, Layers, RefreshCw, CheckCircle2, Sparkles, FolderSync, ShieldCheck, HelpCircle, FileSpreadsheet, UploadCloud, FileText, Download } from "lucide-react";
 import { Tire, UserPersona, TireStatus, CategoryType } from "../types/tyre";
 
 interface InventoryDashboardSectionProps {
@@ -209,6 +209,50 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
 ,BR020,195.55.15,NEXEN N FERA SU4 2026,7.2,,,,2,5,25,32,190,149,41,"4,768.00","6,080.00",
 ,BR022,205.55.16,TOYO CR1 2026,7.2,,,,,,8,8,320,286,34,"2,288.00","2,560.00",`;
     handleCsvInputChange(sampleCSV);
+  };
+
+  const handleDownloadCSVTemplate = () => {
+    const csvHeader = "ID,BRAND_ID,SIZE,BRAND,TREAD_DEPTH_MM,PATTERN,CATEGORY,DISPLAY_ORDER,STOCK_NEXEN_TDU,STOCK_GOODYEAR,STOCK_STORE_TMD,TOTAL_STOCK,MARKET_PRICE,COST_PRICE,PROFIT,TOTAL_STOCK_VALUE,X_VALUE,STATUS\n";
+    const sampleRows = [
+      ",BR001,175.65.14,AEROFORCE P02 2025,7.4,NGreen HD,Passenger,1,0,0,50,50,125,96,29,4800,125.00,In Stock",
+      ",BR002,195.55.15,CONTINENTAL CC7 2026,6.7,UltraContact,Passenger,2,0,0,10,10,252,215,37,2150,252.00,In Stock",
+      ",BR003,205.55.16,TOYO CR1 2026,7.2,Proxes,Passenger,3,0,0,15,15,320,286,34,4290,320.00,In Stock",
+      ",BR004,215.70.16,ATLANDER ROVERSTAR 2024,7.2,Roverstar,SUV / Crossover,4,0,0,8,8,343,278,65,2224,343.00,In Stock",
+      ",BR005,195.50.15,AUTOGREEN SMART CHASER 2026,7.0,SmartChaser,Passenger,5,0,0,20,20,140,110,30,2200,140.00,In Stock"
+    ].join("\n");
+
+    const csvContent = csvHeader + sampleRows;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "template_sync_lias_tyre.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCurrentInventoryCSV = () => {
+    const csvHeader = "ID,BRAND_ID,SIZE,BRAND,TREAD_DEPTH_MM,PATTERN,CATEGORY,DISPLAY_ORDER,STOCK_NEXEN_TDU,STOCK_GOODYEAR,STOCK_STORE_TMD,TOTAL_STOCK,MARKET_PRICE,COST_PRICE,PROFIT,TOTAL_STOCK_VALUE,X_VALUE,STATUS\n";
+    const rows = tyres.map((t, idx) => {
+      const brandFull = `${t.brand} ${t.model}`;
+      const totalVal = t.costPrice * t.storeStock;
+      const profitVal = t.marketPrice - t.costPrice;
+      const sizeDot = t.size.replace(/\//g, ".").replace(/R/g, ".");
+      return `"${t.id}","${t.brandId || ""}","${sizeDot}","${brandFull}",${t.treadDepthMm || 7.5},"${t.pattern || ""}","${t.category}",${idx + 1},${t.supplierStockNexen || 0},${t.supplierStockGoodyear || 0},${t.storeStock},${t.storeStock},${t.marketPrice},${t.costPrice},${profitVal},${totalVal},${t.marketPrice},"${t.status}"`;
+    }).join("\n");
+
+    const csvContent = csvHeader + rows;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inventori_lias_tyre_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleConfirmImportCSV = () => {
@@ -761,6 +805,35 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
             </div>
 
             <div className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Template Download & Export Action Banner */}
+              <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900">Template CSV Rasmi Lias Tyre</h4>
+                    <p className="text-[11px] text-slate-600">Gunakan template standard ini untuk elak isu format atau konflik lajur data semasa sync.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleDownloadCSVTemplate}
+                    className="flex-1 sm:flex-initial px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Muat Turun Template (.csv)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportCurrentInventoryCSV}
+                    className="flex-1 sm:flex-initial px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export Data Semasa
+                  </button>
+                </div>
+              </div>
+
               {/* File Upload & Sample Controls */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div className="space-y-1.5">

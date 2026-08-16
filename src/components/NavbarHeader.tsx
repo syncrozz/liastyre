@@ -28,6 +28,8 @@ interface NavbarHeaderProps {
   setPersona: (persona: UserPersona) => void;
   comparisonCount: number;
   quotationItemCount: number;
+  dbStatus?: "connected" | "quota_exceeded" | "offline";
+  quotaUpgradeUrl?: string;
 }
 
 export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
@@ -37,6 +39,8 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
   setPersona,
   comparisonCount,
   quotationItemCount,
+  dbStatus = "connected",
+  quotaUpgradeUrl = "https://console.firebase.google.com/project/gen-lang-client-0739778545/firestore/databases/ai-studio-liastyre-9d3f4484-47ba-4b0e-9b9c-2a079c143533/data?openUpgradeDialog=true",
 }) => {
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [pinInput, setPinInput] = useState<string>("");
@@ -120,10 +124,28 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 border-b border-slate-800/80 flex flex-wrap justify-between items-center text-xs text-slate-300 gap-2">
         {/* Cloud Sync Status */}
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
-            <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span>Google Cloud Database: <strong>Lias Tyre Active</strong></span>
-          </span>
+          {dbStatus === "quota_exceeded" ? (
+            <a
+              href={quotaUpgradeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-md border border-amber-500/30 hover:bg-amber-500/20 transition-all cursor-pointer group"
+              title="Had Firestore Free Tier Dicapai. Data beroperasi secara pantas melalui Cache Tempatan Lias Tyre. Klik untuk info kuota / naik taraf."
+            >
+              <Cloud className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Google Cloud: <strong className="text-amber-200">Had Quota Harian (Mod Cache Tempatan Aktif)</strong></span>
+            </a>
+          ) : dbStatus === "offline" ? (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded-md border border-sky-500/20">
+              <Cloud className="w-3.5 h-3.5 text-sky-400" />
+              <span>Database: <strong>Mod Luar Talian (Cache Tempatan)</strong></span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
+              <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>Google Cloud Database: <strong>Lias Tyre Active</strong></span>
+            </span>
+          )}
         </div>
 
         {/* Admin Mode Switcher & Actions */}

@@ -20,10 +20,36 @@ import {
   writeBatch
 } from "./lib/firebase";
 
+const LOCAL_STORAGE_TYRES_KEY = "liastyre_pro_inventory_v1";
+
+function getStoredTyres(): Tire[] {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_TYRES_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load inventory from local cache:", e);
+  }
+  return INITIAL_TYRES;
+}
+
+function saveStoredTyres(data: Tire[]) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_TYRES_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("Failed to save inventory to local cache:", e);
+  }
+}
+
 export default function App() {
-  const [tyres, setTyres] = useState<Tire[]>(INITIAL_TYRES);
+  const [tyres, setTyres] = useState<Tire[]>(getStoredTyres);
   const [activeTab, setActiveTab] = useState<NavTab>("smart_search");
   const [persona, setPersona] = useState<UserPersona>("Pemilik Kenderaan");
+  const [dbStatus, setDbStatus] = useState<"connected" | "quota_exceeded" | "offline">("connected");
 
   // Comparison State
   const [comparisonList, setComparisonList] = useState<Tire[]>([]);
@@ -34,32 +60,56 @@ export default function App() {
   // Detail Modal State
   const [selectedDetailTire, setSelectedDetailTire] = useState<Tire | null>(null);
 
-  // Firestore Real-Time Listener
+  // Firestore Real-Time Listener with Quota & Offline fallback
   useEffect(() => {
-    const tyresColRef = collection(db, "tyres");
-    const unsubscribe = onSnapshot(
-      tyresColRef,
-      (snapshot) => {
-        if (snapshot.empty) {
-          // Empty Cloud collection: Seed initial tyres data to Firestore
-          const batch = writeBatch(db);
-          INITIAL_TYRES.forEach((item) => {
-            const docRef = doc(db, "tyres", item.id);
-            batch.set(docRef, item);
-          });
-          batch.commit().catch((err) => console.error("Error seeding initial tyres:", err));
-          setTyres(INITIAL_TYRES);
-        } else {
-          const cloudData: Tire[] = snapshot.docs.map((d) => d.data() as Tire);
-          setTyres(cloudData);
+    let unsubscribe = () => {};
+    try {
+      const tyresColRef = collection(db, "tyres");
+      unsubscribe = onSnapshot(
+        tyresColRef,
+        (snapshot) => {
+          setDbStatus("connected");
+          if (snapshot.empty) {
+            // Empty Cloud collection: Seed initial tyres data to Firestore
+            const batch = writeBatch(db);
+            INITIAL_TYRES.forEach((item) => {
+              const docRef = doc(db, "tyres", item.id);
+              batch.set(docRef, item);
+            });
+            batch.commit().catch((err) => console.warn("Notice: Initial cloud seed:", err));
+            setTyres(INITIAL_TYRES);
+            saveStoredTyres(INITIAL_TYRES);
+          } else {
+            const cloudData: Tire[] = snapshot.docs.map((d) => d.data() as Tire);
+            setTyres(cloudData);
+            saveStoredTyres(cloudData);
+          }
+        },
+        (error) => {
+          const errStr = error?.message || String(error);
+          console.warn("Firestore snapshot notice:", errStr);
+          if (errStr.toLowerCase().includes("quota")) {
+            setDbStatus("quota_exceeded");
+          } else {
+            setDbStatus("offline");
+          }
+          // Ensure data remains available via local cache
+          setTyres((prev) => (prev && prev.length > 0 ? prev : getStoredTyres()));
         }
-      },
-      (error) => {
-        console.error("Firestore snapshot error:", error);
-      }
-    );
+      );
+    } catch (e) {
+      console.warn("Firestore listener initialization:", e);
+      setDbStatus("offline");
+      setTyres(getStoredTyres());
+    }
 
-    return () => unsubscribe();
+    return () => {
+      try {
+        unsubscribe();
+      } catch (e) {
+        // ignore
+      }
+    };
   }, []);
 
   // Toggle Compare
@@ -132,9 +182,8 @@ export default function App() {
     setQuotationItems([]);
   };
 
-  // Import Bulk Tyres from CSV / Excel to Cloud
+  // Import Bulk Tyres from CSV / Excel to Cloud + Local Cache
   const handleImportBulkTyres = async (importedTyres: Tire[]) => {
-    const batch = writeBatch(db);
     const updated = [...tyres];
 
     importedTyres.forEach((imp) => {
@@ -154,26 +203,38 @@ export default function App() {
           status: imp.storeStock <= 0 ? "Out of Stock" : imp.storeStock <= 2 ? "Low Stock" : "In Stock",
         };
         updated[existingIdx] = updatedItem;
-        batch.set(doc(db, "tyres", updatedItem.id), updatedItem);
       } else {
         updated.unshift(imp);
-        batch.set(doc(db, "tyres", imp.id), imp);
       }
     });
 
+    setTyres(updated);
+    saveStoredTyres(updated);
+
     try {
+      const batch = writeBatch(db);
+      importedTyres.forEach((imp) => {
+        const target = updated.find((u) => u.id === imp.id || (u.size === imp.size && u.brand === imp.brand));
+        if (target) {
+          batch.set(doc(db, "tyres", target.id), target);
+        }
+      });
       await batch.commit();
     } catch (err) {
-      console.error("Error committing CSV import to Firestore:", err);
+      console.warn("Cloud write batch notice:", err);
     }
   };
 
   // Add New Tire record
   const handleAddTyre = async (newTire: Tire) => {
+    const updated = [newTire, ...tyres.filter((t) => t.id !== newTire.id)];
+    setTyres(updated);
+    saveStoredTyres(updated);
+
     try {
       await setDoc(doc(db, "tyres", newTire.id), newTire);
     } catch (err) {
-      console.error("Error adding tyre to Firestore:", err);
+      console.warn("Cloud add tyre notice:", err);
     }
   };
 
@@ -187,17 +248,20 @@ export default function App() {
       totalStock: newStock,
       status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : "In Stock",
     };
+    const updated = tyres.map((t) => (t.id === tireId ? updatedTire : t));
+    setTyres(updated);
+    saveStoredTyres(updated);
+
     try {
       await setDoc(doc(db, "tyres", tireId), updatedTire);
     } catch (err) {
-      console.error("Error updating stock in Firestore:", err);
+      console.warn("Cloud update stock notice:", err);
     }
   };
 
   // Sync Master Data Stock
   const handleSyncMasterStock = async (mode: "standard" | "popular" | "reset" | "custom", customQty: number = 10) => {
-    const batch = writeBatch(db);
-    tyres.forEach((t) => {
+    const updated = tyres.map((t) => {
       let newStock = t.storeStock;
       if (mode === "reset") {
         const original = INITIAL_TYRES.find((init) => init.id === t.id);
@@ -213,43 +277,58 @@ export default function App() {
       } else if (mode === "custom") {
         newStock = Math.max(0, customQty);
       }
-      const updatedTire: Tire = {
+      return {
         ...t,
         storeStock: newStock,
         totalStock: newStock,
-        status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : "In Stock",
+        status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : ("In Stock" as const),
       };
-      batch.set(doc(db, "tyres", t.id), updatedTire);
     });
 
+    setTyres(updated);
+    saveStoredTyres(updated);
+
     try {
+      const batch = writeBatch(db);
+      updated.forEach((t) => {
+        batch.set(doc(db, "tyres", t.id), t);
+      });
       await batch.commit();
     } catch (err) {
-      console.error("Error syncing master stock to Firestore:", err);
+      console.warn("Cloud sync master stock notice:", err);
     }
   };
 
   // Deduct Stock on Payment
   const handleDeductStock = async (itemsToDeduct: { tireId: string; quantity: number }[]) => {
-    const batch = writeBatch(db);
-    itemsToDeduct.forEach((item) => {
-      const target = tyres.find((t) => t.id === item.tireId);
-      if (target) {
-        const newStock = Math.max(0, target.storeStock - item.quantity);
-        const updatedTire: Tire = {
-          ...target,
+    const updated = tyres.map((t) => {
+      const deductItem = itemsToDeduct.find((item) => item.tireId === t.id);
+      if (deductItem) {
+        const newStock = Math.max(0, t.storeStock - deductItem.quantity);
+        return {
+          ...t,
           storeStock: newStock,
           totalStock: newStock,
-          status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : "In Stock",
+          status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : ("In Stock" as const),
         };
-        batch.set(doc(db, "tyres", target.id), updatedTire);
       }
+      return t;
     });
 
+    setTyres(updated);
+    saveStoredTyres(updated);
+
     try {
+      const batch = writeBatch(db);
+      itemsToDeduct.forEach((item) => {
+        const target = updated.find((t) => t.id === item.tireId);
+        if (target) {
+          batch.set(doc(db, "tyres", target.id), target);
+        }
+      });
       await batch.commit();
     } catch (err) {
-      console.error("Error deducting stock in Firestore:", err);
+      console.warn("Cloud deduct stock notice:", err);
     }
   };
 
@@ -263,6 +342,8 @@ export default function App() {
         setPersona={setPersona}
         comparisonCount={comparisonList.length}
         quotationItemCount={quotationItems.length}
+        dbStatus={dbStatus}
+        quotaUpgradeUrl="https://console.firebase.google.com/project/gen-lang-client-0739778545/firestore/databases/ai-studio-liastyre-9d3f4484-47ba-4b0e-9b9c-2a079c143533/data?openUpgradeDialog=true"
       />
 
       {/* Main Content Area */}
