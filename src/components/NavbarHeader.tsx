@@ -122,28 +122,34 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-md">
       {/* Top Banner & Status Indicator */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 border-b border-slate-800/80 flex flex-wrap justify-between items-center text-xs text-slate-300 gap-2">
-        {/* Cloud Sync Status */}
+        {/* Cloud Sync Status - Only visible when Admin Mode is active */}
         <div className="flex items-center gap-2">
-          {dbStatus === "quota_exceeded" ? (
-            <a
-              href={quotaUpgradeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-md border border-amber-500/30 hover:bg-amber-500/20 transition-all cursor-pointer group"
-              title="Had Firestore Free Tier Dicapai. Data beroperasi secara pantas melalui Cache Tempatan Lias Tyre. Klik untuk info kuota / naik taraf."
-            >
-              <Cloud className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>Google Cloud: <strong className="text-amber-200">Had Quota Harian (Mod Cache Tempatan Aktif)</strong></span>
-            </a>
-          ) : dbStatus === "offline" ? (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded-md border border-sky-500/20">
-              <Cloud className="w-3.5 h-3.5 text-sky-400" />
-              <span>Database: <strong>Mod Luar Talian (Cache Tempatan)</strong></span>
-            </span>
+          {persona !== "Pemilik Kenderaan" ? (
+            dbStatus === "quota_exceeded" ? (
+              <a
+                href={quotaUpgradeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-md border border-amber-500/30 hover:bg-amber-500/20 transition-all cursor-pointer group"
+                title="Had Firestore Free Tier Dicapai. Data beroperasi secara pantas melalui Cache Tempatan Lias Tyre. Klik untuk info kuota / naik taraf."
+              >
+                <Cloud className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Google Cloud: <strong className="text-amber-200">Had Quota Harian (Mod Cache Tempatan Aktif)</strong></span>
+              </a>
+            ) : dbStatus === "offline" ? (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded-md border border-sky-500/20">
+                <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                <span>Database: <strong>Mod Luar Talian (Cache Tempatan)</strong></span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
+                <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span>Google Cloud Database: <strong>Lias Tyre Active</strong></span>
+              </span>
+            )
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
-              <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span>Google Cloud Database: <strong>Lias Tyre Active</strong></span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+              <span>Pakar Tayar & Servis Automotif Profesional</span>
             </span>
           )}
         </div>
