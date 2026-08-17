@@ -62,11 +62,11 @@ CREATE TABLE IF NOT EXISTS public.settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Seed initial admin security setting (PIN '1234' SHA-256 hash) if not present
+-- Seed initial admin security setting (PIN '6463' SHA-256 hash) if not present
 INSERT INTO public.settings (key, value, updated_at)
 VALUES (
     'security',
-    '{"adminPinHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4", "updatedAt": "2026-08-16T00:00:00.000Z"}'::jsonb,
+    '{"adminPinHash": "0da43cdf1450379df99443aee87dd26fe79d4392cf44b4676e58682eddebd921", "updatedAt": "2026-08-17T00:00:00.000Z"}'::jsonb,
     NOW()
 )
 ON CONFLICT (key) DO NOTHING;

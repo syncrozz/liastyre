@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { BarChart3, Warehouse, DollarSign, TrendingUp, AlertTriangle, Plus, PackageCheck, Layers, RefreshCw, CheckCircle2, Sparkles, FolderSync, ShieldCheck, HelpCircle, FileSpreadsheet, UploadCloud, FileText, Download } from "lucide-react";
 import { Tire, UserPersona, TireStatus, CategoryType } from "../types/tyre";
+import { LIAS_TYRE_CSV_SAMPLE_RAW } from "../data/csvSampleData";
 
 interface InventoryDashboardSectionProps {
   tyres: Tire[];
@@ -10,6 +11,41 @@ interface InventoryDashboardSectionProps {
   onSyncMasterStock?: (mode: "standard" | "popular" | "reset" | "custom", customQty?: number) => void;
   onImportBulkTyres?: (importedTyres: Tire[]) => void;
 }
+
+const KNOWN_BRANDS = [
+  "MICHELIN", "GOODYEAR", "HANKOOK", "CONTINENTAL", "NEXEN", "TOYO",
+  "AUTOGREEN", "DURATURN", "KINGBOSS", "DURUN", "GEPORMAX", "BRIDGESTONE",
+  "LINGLONG", "NEOLIN", "AEROFORCE", "LEAO", "LAUFENN", "YOKOHAMA",
+  "ATLANDER", "WESTLAKE", "LANVIGATOR", "ROADX", "GRIPMAX"
+];
+
+// Helper to extract brand and model cleanly from strings like "GOODYEAR ADP2 2026", "LING LONG 2025"
+const extractBrandAndModel = (rawStr: string): { brand: string; model: string } => {
+  let s = (rawStr || "").trim().replace(/\s+/g, " ");
+  s = s.replace(/^GOOD\s+YEAR/i, "GOODYEAR");
+  s = s.replace(/^LING\s+LONG/i, "LINGLONG");
+  s = s.replace(/^WEST\s+LAKE/i, "WESTLAKE");
+  s = s.replace(/^(LION\s+SPORT\s+A\/T\s+LEAO|LION\s+LEAO\s+SPORT|LEO\s+LION\s+SPORT|LEAO\s+LION\s+TYRE)/i, "LEAO");
+  s = s.replace(/^SMART\s+CHASER/i, "AUTOGREEN SMART CHASER");
+  s = s.replace(/^VANPLUS\s+ATLANDER/i, "ATLANDER");
+  s = s.replace(/^CATCHFORS\s+AT\s+LANVIGATOR/i, "LANVIGATOR");
+
+  const parts = s.split(" ");
+  let matchedBrand = parts[0] ? parts[0].toUpperCase() : "GENERIC";
+  let modelParts = parts.slice(1);
+
+  for (const b of KNOWN_BRANDS) {
+    if (s.toUpperCase().startsWith(b)) {
+      matchedBrand = b;
+      const rest = s.slice(b.length).trim();
+      modelParts = rest ? rest.split(" ") : [modelParts.join(" ")];
+      break;
+    }
+  }
+
+  const modelName = modelParts.join(" ") || "Standard Series";
+  return { brand: matchedBrand, model: modelName };
+};
 
 export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps> = ({
   tyres,
@@ -41,29 +77,37 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
   const [costPrice, setCostPrice] = useState(280);
   const [storeStock, setStoreStock] = useState(10);
 
-  // Normalize Size Format (e.g., "175.65.14" -> "175/65R14", "175.R.13C" -> "175/R13C")
+  // Normalize Size Format (e.g., "155.70.12" -> "155/70R12", "175.R.13C" -> "175R13C", "215.75.17.5" -> "215/75R17.5")
   const normalizeSize = (rawSize: string): string => {
     if (!rawSize) return "205/55R16";
     let s = rawSize.trim();
-    if (s.includes("/") && s.includes("R")) return s;
+    if (s.includes("/") && s.includes("R")) return s.toUpperCase();
 
-    // e.g. 175.65.14 -> 175/65R14
+    // Commercial R format: 175.R.13C, 185.R.14C, 195.R.15C, 165.R.14C
+    if (/^\d+\.R\.\d+/i.test(s)) {
+      return s.replace(/^(\d+)\.R\.(\d+.*)$/i, "$1R$2").toUpperCase();
+    }
+    // Commercial R format: 185.R14C, 195.R15C, 195.R.15
+    if (/^\d+\.R\d+/i.test(s)) {
+      return s.replace(/^(\d+)\.R(\d+.*)$/i, "$1R$2").toUpperCase();
+    }
+    // Decimal rim format: 215.75.17.5 -> 215/75R17.5
+    if (/^\d+\.\d+\.\d+\.\d+/.test(s)) {
+      const parts = s.split(".");
+      return `${parts[0]}/${parts[1]}R${parts[2]}.${parts[3]}`.toUpperCase();
+    }
+    // Standard format: 155.70.12 -> 155/70R12 or 215.70.16C -> 215/70R16C
     if (/^\d+\.\d+\.\d+/.test(s)) {
       const parts = s.split(".");
       const width = parts[0];
       const aspect = parts[1];
       const rest = parts.slice(2).join("");
-      return `${width}/${aspect}R${rest}`;
+      return `${width}/${aspect}R${rest}`.toUpperCase();
     }
-    // e.g. 175.R.13C -> 175/R13C
-    if (/^\d+\.R\.\d+/.test(s)) {
-      const parts = s.split(".R.");
-      return `${parts[0]}/R${parts[1]}`;
-    }
-    // e.g. 185.R.14C or 185.R14C
-    s = s.replace(/^(\d+)\.(R\d+.*)$/i, "$1/$2");
+
+    s = s.replace(/^(\d+)\.(R\d+.*)$/i, "$1R$2");
     s = s.replace(/^(\d+)\.(\d+)\.(\d+)(.*)$/, "$1/$2R$3$4");
-    return s;
+    return s.toUpperCase();
   };
 
   // Helper to parse line with CSV quotes
@@ -86,7 +130,7 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
     return result;
   };
 
-  // Parse CSV text to Tire array
+  // Parse CSV text to Tire array matching latest 15-column format
   const parseCSVTextToTyres = (raw: string): Tire[] => {
     const lines = raw
       .split("\n")
@@ -96,7 +140,14 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
 
     let startIdx = 0;
     const firstLine = lines[0].toUpperCase();
-    if (firstLine.includes("SIZE") || firstLine.includes("BRAND") || firstLine.includes("MARKET_PRICE")) {
+    const isHeader =
+      firstLine.includes("SIZE") ||
+      firstLine.includes("BRAND") ||
+      firstLine.includes("HARGA") ||
+      firstLine.includes("TEBAL") ||
+      firstLine.includes("MARKET_PRICE");
+
+    if (isHeader) {
       startIdx = 1; // Header row
     }
 
@@ -106,24 +157,63 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
       const cols = parseCsvRow(lines[i]);
       if (cols.length < 3) continue;
 
-      // Expecting columns matching user format:
-      // ID, BRAND_ID, SIZE, BRAND, TREAD_DEPTH_MM, PATTERN, CATEGORY, DISPLAY_ORDER, STOCK_NEXEN_TDU, STOCK_GOODYEAR, STOCK_STORE_TMD, TOTAL_STOCK, MARKET_PRICE, COST_PRICE, PROFIT, TOTAL_STOCK_VALUE, X_VALUE, STATUS
-      const rawSize = cols[2] || cols[1] || "";
-      const rawBrandFull = cols[3] || cols[2] || "BRAND";
-      const treadDepth = parseFloat(cols[4]) || 7.5;
-      const patternName = cols[5] || "All Season";
-      const categoryRaw = cols[6] || "Passenger";
+      let rawBrandId = "";
+      let rowSeq = i;
+      let rawSize = "";
+      let rawBrandFull = "";
+      let treadDepth = 7.5;
+      let nexenStock = 0;
+      let goodyearStock = 0;
+      let storeStockVal = 0;
+      let totalStockVal = 0;
+      let mktPriceVal = 180;
+      let costPriceVal = 140;
 
-      // Stock
-      const totalStockVal = parseInt(cols[11] || cols[10] || "10") || 10;
-      const mktPriceVal = parseFloat((cols[12] || "0").replace(/,/g, "").replace(/"/g, "")) || 180;
-      const costPriceVal = parseFloat((cols[13] || "0").replace(/,/g, "").replace(/"/g, "")) || 140;
+      // Handle user's 15-column template structure:
+      // Index 0: BRAND ID (e.g. '', '1.00', 'BR001')
+      // Index 1: NO (e.g. '1', '2', '3')
+      // Index 2: SIZE TAYAR (e.g. '155.70.12', '175.65.14', '175.R.13C', '215.75.17.5')
+      // Index 3: BRAND (e.g. 'GEPORMAX ECOPLUS HP 2026', 'GOODYEAR ADP2 2026')
+      // Index 4: TEBAL - MM (e.g. '5.60')
+      // Index 5: NEXEN TDU
+      // Index 6: GOODYEAR
+      // Index 7: STORE TMD
+      // Index 8: TOTAL STOK
+      // Index 9: HARGA MARKET - REGULAR 1
+      // Index 10: HARGA MARKET - NEW 2
+      // Index 11: HARGA STOK (Cost)
+      // Index 12: NEW PROFIT nov 25
+      // Index 13: TOTAL STOK VALUE
+      // Index 14: SOLD VALUE
+      if (cols.length >= 10 && (cols[2].includes(".") || cols[2].includes("/") || cols[2].toUpperCase().includes("R"))) {
+        rawBrandId = cols[0] || "";
+        rowSeq = parseInt(cols[1]) || i;
+        rawSize = cols[2] || "205/55R16";
+        rawBrandFull = cols[3] || "GOODYEAR Standard Series";
+        treadDepth = parseFloat(cols[4]) || 7.5;
+        nexenStock = parseInt(cols[5]) || 0;
+        goodyearStock = parseInt(cols[6]) || 0;
+        storeStockVal = parseInt(cols[7]) || 0;
+        totalStockVal = parseInt(cols[8]) || (storeStockVal + nexenStock + goodyearStock);
+        mktPriceVal = parseFloat((cols[9] || "0").replace(/,/g, "").replace(/"/g, "")) || 0;
+        if (mktPriceVal === 0 && cols[10]) {
+          mktPriceVal = parseFloat((cols[10] || "0").replace(/,/g, "").replace(/"/g, "")) || 0;
+        }
+        costPriceVal = parseFloat((cols[11] || "0").replace(/,/g, "").replace(/"/g, "")) || (mktPriceVal > 0 ? Math.round(mktPriceVal * 0.75) : 100);
+      } else {
+        // Fallback / legacy format detection
+        rawSize = cols[2] || cols[1] || "";
+        rawBrandFull = cols[3] || cols[2] || "BRAND";
+        treadDepth = parseFloat(cols[4]) || 7.5;
+        totalStockVal = parseInt(cols[11] || cols[8] || cols[7] || "10") || 10;
+        storeStockVal = parseInt(cols[10] || cols[7] || String(totalStockVal)) || totalStockVal;
+        nexenStock = parseInt(cols[8] || cols[5]) || 0;
+        goodyearStock = parseInt(cols[9] || cols[6]) || 0;
+        mktPriceVal = parseFloat((cols[12] || cols[9] || "0").replace(/,/g, "").replace(/"/g, "")) || 180;
+        costPriceVal = parseFloat((cols[13] || cols[11] || "0").replace(/,/g, "").replace(/"/g, "")) || 140;
+      }
 
-      // Extract Brand name & Model name from full string e.g. "AEROFORCE P02 2025" or "CONTINENTAL CC7 2026"
-      const brandParts = rawBrandFull.trim().split(" ");
-      const brandName = brandParts[0] ? brandParts[0].toUpperCase() : "GENERIC";
-      const modelName = brandParts.slice(1).join(" ") || "Standard Series";
-
+      const { brand: brandName, model: modelName } = extractBrandAndModel(rawBrandFull);
       const formattedSize = normalizeSize(rawSize);
       const sizeParts = formattedSize.split("/");
       const width = parseInt(sizeParts[0]) || 205;
@@ -133,43 +223,99 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
       if (sizeParts[1]) {
         const sub = sizeParts[1].split("R");
         aspect = parseInt(sub[0]) || 55;
-        rim = parseInt(sub[1]) || 16;
+        rim = parseFloat(sub[1]) || 16;
+      } else if (formattedSize.includes("R")) {
+        const rParts = formattedSize.split("R");
+        rim = parseFloat(rParts[1]) || 14;
+        aspect = 80;
       }
 
-      const cat: CategoryType =
-        categoryRaw.toLowerCase().includes("suv") ? "SUV / Crossover" :
-        categoryRaw.toLowerCase().includes("van") || categoryRaw.toLowerCase().includes("comm") ? "Commercial / Van" :
-        categoryRaw.toLowerCase().includes("driver") || categoryRaw.toLowerCase().includes("passenger") ? "Passenger" : "Passenger";
+      // Determine category smartly based on size and model
+      let cat: CategoryType = "Passenger";
+      const fullText = (formattedSize + " " + rawBrandFull).toUpperCase();
+      if (
+        fullText.includes("17.5") ||
+        fullText.includes("VAN") ||
+        fullText.includes("CARGO") ||
+        fullText.includes("RA18") ||
+        fullText.includes("LT") ||
+        fullText.includes("COMMERCIAL") ||
+        fullText.includes("SUMTIRA") ||
+        fullText.includes("CTX") ||
+        formattedSize.toUpperCase().endsWith("C")
+      ) {
+        cat = "Commercial / Van";
+      } else if (
+        fullText.includes("SUV") ||
+        fullText.includes("A/T") ||
+        fullText.includes(" AT ") ||
+        fullText.includes("AT002") ||
+        fullText.includes("AT2") ||
+        fullText.includes("M/T") ||
+        fullText.includes("MT") ||
+        fullText.includes("XTREME") ||
+        fullText.includes("GEOLANDER") ||
+        fullText.includes("D697") ||
+        fullText.includes("DYNAPRO") ||
+        fullText.includes("CROSSWIND A/T") ||
+        fullText.includes("GRANDTOUR") ||
+        fullText.includes("ENTERRA") ||
+        fullText.includes("4X4") ||
+        fullText.includes("OFFROAD") ||
+        (width >= 225 && rim >= 17 && aspect >= 60)
+      ) {
+        cat = fullText.includes("M/T") || fullText.includes("XTREME") || fullText.includes("4X4")
+          ? "4x4 / Offroad"
+          : "SUV / Crossover";
+      } else if (
+        fullText.includes("UHP") ||
+        fullText.includes("SPORT") ||
+        fullText.includes("TR1") ||
+        fullText.includes("EAGLE F1") ||
+        fullText.includes("VENTUS PRIME") ||
+        aspect <= 45
+      ) {
+        cat = "Performance / UHP";
+      }
+
+      // Extract Year if present e.g. 2026, 2025, 2024, 2023, 2021, 2019
+      const yearMatch = rawBrandFull.match(/\b(201\d|202\d)\b/);
+      const tireYear = yearMatch ? parseInt(yearMatch[1]) : 2026;
+
+      const tireId =
+        rawBrandId && rawBrandId.startsWith("BR")
+          ? rawBrandId
+          : `SKU-${rowSeq}-${brandName.slice(0, 3)}-${formattedSize.replace(/[^A-Za-z0-9]/g, "")}`;
 
       tyresList.push({
-        id: `CSV-${i}-${Date.now()}`,
-        brandId: cols[1]?.toLowerCase() || brandName.toLowerCase(),
+        id: tireId,
+        brandId: brandName.toLowerCase().replace(/[^a-z0-9]/g, ""),
         brand: brandName,
         size: formattedSize,
         width,
         aspectRatio: aspect,
-        rimSize: rim,
+        rimSize: Math.floor(rim),
         model: modelName,
-        pattern: patternName || "High Performance",
+        pattern: fullText.includes("ROTATION") ? "Directional / Rotation" : "All-Weather Dynamic",
         category: cat,
         treadDepthMm: treadDepth,
-        speedRating: "V",
-        loadIndex: 91,
+        speedRating: aspect <= 45 ? "W" : aspect <= 55 ? "V" : "H",
+        loadIndex: cat === "Commercial / Van" ? 104 : width >= 225 ? 99 : 91,
         marketPrice: mktPriceVal,
         costPrice: costPriceVal,
         profit: mktPriceVal - costPriceVal,
-        storeStock: totalStockVal,
-        supplierStockNexen: parseInt(cols[8]) || 0,
-        supplierStockGoodyear: parseInt(cols[9]) || 0,
-        totalStock: totalStockVal,
-        status: totalStockVal <= 0 ? "Out of Stock" : totalStockVal <= 2 ? "Low Stock" : "In Stock",
-        year: 2026,
-        wetGripRating: "A",
-        noiseLevelDb: 69,
+        storeStock: storeStockVal,
+        supplierStockNexen: nexenStock,
+        supplierStockGoodyear: goodyearStock,
+        totalStock: totalStockVal || storeStockVal,
+        status: storeStockVal <= 0 ? "Out of Stock" : storeStockVal <= 2 ? "Low Stock" : "In Stock",
+        year: tireYear,
+        wetGripRating: mktPriceVal >= 300 ? "A" : "B",
+        noiseLevelDb: aspect <= 45 ? 71 : 68,
         fuelSavingRating: "B",
-        treadLifeKm: 50000,
-        description: `Tayar ${brandName} ${modelName} saiz ${formattedSize}.`,
-        keyTechnologies: ["Sync Auto-Mapped", "High Traction Compound"]
+        treadLifeKm: cat === "Commercial / Van" ? 65000 : 50000,
+        description: `Tayar ${brandName} ${modelName} saiz ${formattedSize} spesifikasi rasmi Lias Tyre.`,
+        keyTechnologies: ["Sync Auto-Mapped", "TMD Inventory Certified"]
       });
     }
 
@@ -196,29 +342,19 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
   };
 
   const handleLoadSampleCSV = () => {
-    const sampleCSV = `ID,BRAND_ID,SIZE,BRAND,TREAD_DEPTH_MM,PATTERN,CATEGORY,DISPLAY_ORDER,STOCK_NEXEN_TDU,STOCK_GOODYEAR,STOCK_STORE_TMD,TOTAL_STOCK,MARKET_PRICE,COST_PRICE,PROFIT,TOTAL_STOCK_VALUE,X_VALUE,STATUS
-,BR001,175.65.14,AEROFORCE P02 2025,7.4,NGreen HD,Driver,test3,,,600,600,125,96,29,96.00,125.00,On Order
-,BR002,215.70.16,ATLANDER ROVERSTAR 2024,7.2,,,,,,,0,343,278,65,0.00,0.00,
-,BR003,205.55.16,AUTOGREEN SMART CHASER SC1 2026,6.7,,,,1,,14,15,195,123,72,"1,845.00","2,925.00",
-,BR003,195.50.15,AUTOGREEN SMART CHASER 2026,7,,,,,,11,11,140,110,30,"1,210.00","1,540.00",
-,BR004,265.60.18,BRIDGESTONE AT002 2025,9.1,,,,,,5,5,630,559,71,0.00,0.00,
-,BR006,195.55.15,CONTINENTAL CC7 2026,6.7,,,,,,6,6,252,215,37,"1,290.00","1,512.00",
-,BR010,175.65.14,GOODYEAR ADP2 2026,7.2,,,,,4,16,20,190,156,34,"3,120.00","3,800.00",
-,BR012,185.60.15,HANKOOK K435 2026,7.3,,,,,,5,5,212,165,47,825.00,"1,060.00",
-,BR018,235.50.18,MICHELIN PRIMACY 5 2026,7.8,,,,,,6,6,626,566,60,"3,396.00","3,756.00",
-,BR020,195.55.15,NEXEN N FERA SU4 2026,7.2,,,,2,5,25,32,190,149,41,"4,768.00","6,080.00",
-,BR022,205.55.16,TOYO CR1 2026,7.2,,,,,,8,8,320,286,34,"2,288.00","2,560.00",`;
-    handleCsvInputChange(sampleCSV);
+    handleCsvInputChange(LIAS_TYRE_CSV_SAMPLE_RAW);
   };
 
   const handleDownloadCSVTemplate = () => {
-    const csvHeader = "ID,BRAND_ID,SIZE,BRAND,TREAD_DEPTH_MM,PATTERN,CATEGORY,DISPLAY_ORDER,STOCK_NEXEN_TDU,STOCK_GOODYEAR,STOCK_STORE_TMD,TOTAL_STOCK,MARKET_PRICE,COST_PRICE,PROFIT,TOTAL_STOCK_VALUE,X_VALUE,STATUS\n";
+    const csvHeader = "BRAND ID,NO,SIZE TAYAR,BRAND,TEBAL - MM,NEXEN TDU,GOODYEAR,STORE TMD,TOTAL STOK,HARGA MARKET - REGULAR 1,HARGA MARKET - NEW 2,HARGA STOK,NEW PROFIT nov 25,TOTAL STOK VALUE,SOLD VALUE\n";
     const sampleRows = [
-      ",BR001,175.65.14,AEROFORCE P02 2025,7.4,NGreen HD,Passenger,1,0,0,50,50,125,96,29,4800,125.00,In Stock",
-      ",BR002,195.55.15,CONTINENTAL CC7 2026,6.7,UltraContact,Passenger,2,0,0,10,10,252,215,37,2150,252.00,In Stock",
-      ",BR003,205.55.16,TOYO CR1 2026,7.2,Proxes,Passenger,3,0,0,15,15,320,286,34,4290,320.00,In Stock",
-      ",BR004,215.70.16,ATLANDER ROVERSTAR 2024,7.2,Roverstar,SUV / Crossover,4,0,0,8,8,343,278,65,2224,343.00,In Stock",
-      ",BR005,195.50.15,AUTOGREEN SMART CHASER 2026,7.0,SmartChaser,Passenger,5,0,0,20,20,140,110,30,2200,140.00,In Stock"
+      ",1,155.70.12,GEPORMAX ECOPLUS HP 2026,5.60,2.00,,6.00,8.00,124.00,134.00,85.00,39.00,680.00,992.00",
+      ",2,175.65.14,GOODYEAR ADP2 2026,7.20,4.00,8.00,17.00,29.00,190.00,200.00,156.00,34.00,4524.00,5510.00",
+      ",3,185.55.15,MICHELIN XM2+ 2026,7.80,,,4.00,4.00,319.00,334.00,273.00,46.00,1092.00,1276.00",
+      ",4,195.55.15,NEXEN N FERA SU4 2026,7.20,4.00,5.00,17.00,26.00,190.00,205.00,149.00,16.00,3874.00,4940.00",
+      ",5,205.55.16,TOYO CR1 2026,7.20,,,6.00,6.00,320.00,340.00,286.00,34.00,1716.00,1920.00",
+      ",6,265.65.17,HANKOOK DYNAPRO AT2 XTREME 2026,9.00,,,4.00,4.00,470.00,500.00,400.00,70.00,1600.00,1880.00",
+      ",7,185.R14C,GOODYEAR CARGO MARATHON2 2024,8.80,,,2.00,2.00,310.00,320.00,285.00,25.00,570.00,620.00"
     ].join("\n");
 
     const csvContent = csvHeader + sampleRows;
@@ -234,13 +370,23 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
   };
 
   const handleExportCurrentInventoryCSV = () => {
-    const csvHeader = "ID,BRAND_ID,SIZE,BRAND,TREAD_DEPTH_MM,PATTERN,CATEGORY,DISPLAY_ORDER,STOCK_NEXEN_TDU,STOCK_GOODYEAR,STOCK_STORE_TMD,TOTAL_STOCK,MARKET_PRICE,COST_PRICE,PROFIT,TOTAL_STOCK_VALUE,X_VALUE,STATUS\n";
+    const csvHeader = "BRAND ID,NO,SIZE TAYAR,BRAND,TEBAL - MM,NEXEN TDU,GOODYEAR,STORE TMD,TOTAL STOK,HARGA MARKET - REGULAR 1,HARGA MARKET - NEW 2,HARGA STOK,NEW PROFIT nov 25,TOTAL STOK VALUE,SOLD VALUE\n";
     const rows = tyres.map((t, idx) => {
       const brandFull = `${t.brand} ${t.model}`;
-      const totalVal = t.costPrice * t.storeStock;
-      const profitVal = t.marketPrice - t.costPrice;
+      const totalCostVal = (t.costPrice * t.storeStock).toFixed(2);
+      const soldVal = (t.marketPrice * t.storeStock).toFixed(2);
+      const profitVal = (t.marketPrice - t.costPrice).toFixed(2);
       const sizeDot = t.size.replace(/\//g, ".").replace(/R/g, ".");
-      return `"${t.id}","${t.brandId || ""}","${sizeDot}","${brandFull}",${t.treadDepthMm || 7.5},"${t.pattern || ""}","${t.category}",${idx + 1},${t.supplierStockNexen || 0},${t.supplierStockGoodyear || 0},${t.storeStock},${t.storeStock},${t.marketPrice},${t.costPrice},${profitVal},${totalVal},${t.marketPrice},"${t.status}"`;
+      const nexenStock = t.supplierStockNexen ? t.supplierStockNexen.toFixed(2) : "";
+      const goodyearStock = t.supplierStockGoodyear ? t.supplierStockGoodyear.toFixed(2) : "";
+      const storeStockStr = t.storeStock.toFixed(2);
+      const totalStockStr = t.totalStock.toFixed(2);
+      const marketPriceStr = t.marketPrice.toFixed(2);
+      const promoPriceStr = (t.marketPrice + 10).toFixed(2);
+      const costPriceStr = t.costPrice.toFixed(2);
+      const treadStr = (t.treadDepthMm || 7.5).toFixed(2);
+
+      return `"${t.brandId || ""}","${idx + 1}","${sizeDot}","${brandFull}",${treadStr},${nexenStock},${goodyearStock},${storeStockStr},${totalStockStr},${marketPriceStr},${promoPriceStr},${costPriceStr},${profitVal},${totalCostVal},${soldVal}`;
     }).join("\n");
 
     const csvContent = csvHeader + rows;
@@ -876,7 +1022,7 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
                   rows={5}
                   value={csvText}
                   onChange={(e) => handleCsvInputChange(e.target.value)}
-                  placeholder="ID,BRAND_ID,SIZE,BRAND,TREAD_DEPTH_MM,PATTERN,CATEGORY,DISPLAY_ORDER,STOCK_NEXEN_TDU,STOCK_GOODYEAR,STOCK_STORE_TMD,TOTAL_STOCK,MARKET_PRICE,COST_PRICE..."
+                  placeholder="BRAND ID,NO,SIZE TAYAR,BRAND,TEBAL - MM,NEXEN TDU,GOODYEAR,STORE TMD,TOTAL STOK,HARGA MARKET - REGULAR 1,HARGA MARKET - NEW 2,HARGA STOK,NEW PROFIT nov 25,TOTAL STOK VALUE,SOLD VALUE..."
                   className="w-full bg-slate-900 text-emerald-400 font-mono text-[11px] p-3 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>

@@ -387,7 +387,7 @@ export const NavbarHeader: React.FC<NavbarHeaderProps> = ({
                     setNewPinInput(e.target.value);
                     if (changePinError) setChangePinError("");
                   }}
-                  placeholder="Contoh: 5313"
+                  placeholder="Contoh: 6463"
                   autoFocus
                   className="w-full text-center tracking-[0.5em] text-2xl font-bold font-mono bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-xl px-4 py-3 text-white outline-none"
                 />
