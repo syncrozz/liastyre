@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Tire, UserPersona } from "../types/tyre";
-import { ShieldCheck, Award, Info, Sparkles, ZoomIn, Activity, Scale, Image as ImageIcon } from "lucide-react";
+import { ShieldCheck, Award, Info, Sparkles, ZoomIn, Activity, Scale, Image as ImageIcon, Tag, Percent, Check, Edit3, X, Globe, Calendar } from "lucide-react";
 import { resolveTireImageUrl, getTireStudioMeta, CATEGORY_FALLBACK_IMAGES, DEFAULT_TIRE_PLACEHOLDER } from "../utils/tireImageResolver";
+import { getTirePriceDetails } from "../utils/tireDiscount";
+import { getTireMadeIn, getTireMadeInAndYear, getTireCountryFlag } from "../utils/tireOrigin";
 
 interface TireCardShowcaseProps {
   tire: Tire;
@@ -10,6 +12,7 @@ interface TireCardShowcaseProps {
   isCompared?: boolean;
   onToggleCompare?: (tire: Tire) => void;
   onAddToQuotation?: (tire: Tire) => void;
+  onUpdateDiscount?: (tireId: string, discountPercent: number, discountPrice?: number, discountLabel?: string) => void;
 }
 
 // Brand theme badge styling matching user's reference image
@@ -92,30 +95,76 @@ export const TireCardShowcase: React.FC<TireCardShowcaseProps> = ({
   isCompared,
   onToggleCompare,
   onAddToQuotation,
+  onUpdateDiscount,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [showDiscountMenu, setShowDiscountMenu] = useState(false);
+  const [customDiscountVal, setCustomDiscountVal] = useState<string>("");
+
   const brandTheme = getBrandTheme(tire.brand);
   const resolvedImgUrl = resolveTireImageUrl(tire);
   const studioMeta = getTireStudioMeta(tire);
+  const priceDetails = getTirePriceDetails(tire);
+  const madeInCountry = getTireMadeIn(tire);
+  const originFlag = getTireCountryFlag(madeInCountry);
+  const madeInAndYear = getTireMadeInAndYear(tire);
+
+  const handleSetPresetDiscount = (e: React.MouseEvent, percent: number) => {
+    e.stopPropagation();
+    if (onUpdateDiscount) {
+      onUpdateDiscount(tire.id, percent);
+    }
+    setShowDiscountMenu(false);
+  };
+
+  const handleApplyCustomDiscount = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const val = parseInt(customDiscountVal, 10);
+    if (!isNaN(val) && val >= 0 && val <= 90 && onUpdateDiscount) {
+      onUpdateDiscount(tire.id, val);
+    }
+    setShowDiscountMenu(false);
+    setCustomDiscountVal("");
+  };
 
   return (
     <div
       onClick={() => onViewDetail(tire)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group bg-[#f2f3f5] rounded-2xl p-4 border border-slate-200/90 hover:border-slate-400 hover:border-red-500/30 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden cursor-pointer"
+      className={`group bg-[#f2f3f5] rounded-2xl p-4 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden cursor-pointer ${
+        priceDetails.hasDiscount
+          ? "border-red-300 hover:border-red-500 shadow-sm hover:shadow-xl ring-1 ring-red-500/20"
+          : "border-slate-200/90 hover:border-slate-400 hover:border-red-500/30 shadow-sm hover:shadow-xl"
+      }`}
     >
+      {/* Top Discount Floating Banner if active */}
+      {priceDetails.hasDiscount && (
+        <div className="absolute -right-12 top-6 bg-gradient-to-r from-red-600 to-rose-600 text-white font-black text-[10px] tracking-wider py-1 px-12 rotate-45 shadow-md z-30 flex items-center justify-center gap-1 uppercase pointer-events-none">
+          <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+          {priceDetails.discountPercent}% OFF
+        </div>
+      )}
+
       {/* Top Banner & Header */}
       <div className="space-y-3">
-        {/* Brand Banner Badge & Stock Pill */}
+        {/* Brand Banner Badge, Stock Pill & Discount Promo Tag */}
         <div className="flex items-start justify-between gap-2">
-          {/* Brand Logo Banner (Matching user reference image style) */}
-          <div
-            className={`${brandTheme.bg} ${brandTheme.text} px-3 py-1.5 rounded-md shadow-sm border-l-4 ${brandTheme.accent} inline-flex items-center gap-1.5 max-w-[70%] overflow-hidden`}
-          >
-            <span className="text-xs font-black tracking-wider uppercase truncate">
-              {brandTheme.logoText}
-            </span>
+          {/* Brand Logo Banner */}
+          <div className="flex flex-col gap-1 max-w-[65%]">
+            <div
+              className={`${brandTheme.bg} ${brandTheme.text} px-3 py-1.5 rounded-md shadow-sm border-l-4 ${brandTheme.accent} inline-flex items-center gap-1.5 overflow-hidden`}
+            >
+              <span className="text-xs font-black tracking-wider uppercase truncate">
+                {brandTheme.logoText}
+              </span>
+            </div>
+            {priceDetails.hasDiscount && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md w-fit">
+                <Tag className="w-3 h-3 text-red-600" />
+                {priceDetails.discountLabel || `Diskaun ${priceDetails.discountPercent}%`}
+              </span>
+            )}
           </div>
 
           {/* Stock & Size Badge */}
@@ -143,33 +192,32 @@ export const TireCardShowcase: React.FC<TireCardShowcaseProps> = ({
 
         {/* Studio Visual Grid: Left Performance Specs + Right Tire Tread Render */}
         <div className="grid grid-cols-12 gap-2 items-center bg-white/70 p-3 rounded-xl border border-slate-200/60 backdrop-blur-xs relative">
-          {/* Left Column: Key Performance Metrics */}
-          <div className="col-span-5 space-y-1.5 border-r border-slate-200/80 pr-2">
+          {/* Left Column: Made In & Tahun Keluaran */}
+          <div className="col-span-5 flex flex-col justify-center space-y-1.5 border-r border-slate-200/80 pr-2">
             <div>
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">
-                Cengkaman Basah
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Made In
               </div>
-              <div className="text-xs font-black text-emerald-700 leading-tight">
-                Gred {tire.wetGripRating || "A"}
-              </div>
-            </div>
-
-            <div className="pt-1 border-t border-slate-100">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">
-                Penjimatan Minyak
-              </div>
-              <div className="text-xs font-black text-slate-800 leading-tight">
-                Gred {tire.fuelSavingRating || "B"}
+              <div className="text-xs font-black text-slate-900 uppercase flex items-center gap-1 mt-0.5">
+                <span className="text-sm leading-none">{originFlag}</span>
+                <span className="truncate">{madeInCountry}</span>
               </div>
             </div>
 
             <div className="pt-1 border-t border-slate-100">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">
-                Bunyi Kabin
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Tahun
               </div>
-              <div className="text-xs font-black text-slate-800 leading-tight">
-                {tire.noiseLevelDb} dB
+              <div className="text-xs font-black text-slate-900 font-mono flex items-center gap-1 mt-0.5">
+                <Calendar className="w-3 h-3 text-red-600 shrink-0" />
+                <span>{tire.year || 2026}</span>
               </div>
+            </div>
+
+            <div className="pt-1">
+              <span className="inline-flex items-center gap-1 bg-slate-900 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-xs uppercase tracking-wider w-full justify-center text-center">
+                {madeInAndYear}
+              </span>
             </div>
           </div>
 
@@ -240,25 +288,130 @@ export const TireCardShowcase: React.FC<TireCardShowcaseProps> = ({
         </div>
       </div>
 
-      {/* Pricing Section */}
-      <div className="pt-3 mt-3 border-t border-slate-200/80">
+      {/* Pricing Section & Admin Discount Setter */}
+      <div className="pt-3 mt-3 border-t border-slate-200/80 space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-[10px] text-slate-500 uppercase font-semibold block">Harga Pasaran</span>
-            <div className="text-lg font-black text-red-600 font-mono leading-none">
-              RM {tire.marketPrice}
-            </div>
+            <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+              {priceDetails.hasDiscount ? "Harga Tawaran Diskaun" : "Harga Pasaran"}
+            </span>
+            
+            {priceDetails.hasDiscount ? (
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="line-through text-slate-400 font-mono text-xs font-semibold">
+                    RM{priceDetails.originalPrice}
+                  </span>
+                  <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded">
+                    Jimat RM{priceDetails.savings}
+                  </span>
+                </div>
+                <div className="text-xl font-black text-red-600 font-mono leading-none">
+                  RM {priceDetails.finalPrice}
+                </div>
+              </div>
+            ) : (
+              <div className="text-lg font-black text-red-600 font-mono leading-none">
+                RM {priceDetails.finalPrice}
+              </div>
+            )}
           </div>
 
-          {persona === "Kedai Tayar" && (
-            <div className="text-right">
-              <span className="text-[10px] text-slate-400 block font-mono">Kos Est: RM{tire.costPrice}</span>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded">
-                Untung: RM{tire.profit}
-              </span>
-            </div>
-          )}
+          <div className="text-right flex flex-col items-end gap-1">
+            {persona === "Kedai Tayar" && (
+              <>
+                <span className="text-[10px] text-slate-400 block font-mono">Kos: RM{tire.costPrice}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDiscountMenu(!showDiscountMenu);
+                  }}
+                  className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all flex items-center gap-1 cursor-pointer ${
+                    priceDetails.hasDiscount
+                      ? "bg-red-600 text-white border-red-700 shadow-xs"
+                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-xs"
+                  }`}
+                  title="Tetapkan diskaun untuk item ini"
+                >
+                  <Percent className="w-3 h-3" />
+                  {priceDetails.hasDiscount ? `Diskaun ${priceDetails.discountPercent}%` : "+ Set Diskaun"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Admin Quick Discount Dropdown / Popover */}
+        {persona === "Kedai Tayar" && showDiscountMenu && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="p-3 bg-white rounded-xl border border-red-200 shadow-xl space-y-2 text-xs animate-fadeIn"
+          >
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+              <span className="font-extrabold text-slate-900 text-[11px] flex items-center gap-1">
+                <Tag className="w-3 h-3 text-red-600" /> Tetapkan Diskaun Item Ini
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDiscountMenu(false);
+                }}
+                className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => handleSetPresetDiscount(e, 0)}
+                className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                  !priceDetails.hasDiscount
+                    ? "bg-slate-800 text-white border-slate-800"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+                }`}
+              >
+                Tiada (0%)
+              </button>
+              {[5, 10, 15, 20, 25, 30].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={(e) => handleSetPresetDiscount(e, pct)}
+                  className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                    priceDetails.hasDiscount && priceDetails.discountPercent === pct
+                      ? "bg-red-600 text-white border-red-600"
+                      : "bg-red-50 text-red-700 hover:bg-red-100 border-red-200"
+                  }`}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1 pt-1">
+              <input
+                type="number"
+                min="1"
+                max="90"
+                placeholder="Custom %"
+                value={customDiscountVal}
+                onChange={(e) => setCustomDiscountVal(e.target.value)}
+                className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-900 font-mono text-[11px] outline-none focus:border-red-500"
+              />
+              <button
+                type="button"
+                onClick={handleApplyCustomDiscount}
+                className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] rounded transition-colors"
+              >
+                Simpan %
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

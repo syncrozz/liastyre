@@ -1,6 +1,7 @@
 import React from "react";
-import { GitCompare, Trash2, PlusCircle, Sparkles, Check, X, ShieldCheck, ArrowRight } from "lucide-react";
+import { GitCompare, Trash2, PlusCircle, Sparkles, Check, X, ShieldCheck, ArrowRight, Globe } from "lucide-react";
 import { Tire, UserPersona } from "../types/tyre";
+import { getTireMadeIn, getTireCountryFlag, getTireMadeInAndYear } from "../utils/tireOrigin";
 
 interface ProductComparisonSectionProps {
   comparisonList: Tire[];
@@ -127,6 +128,24 @@ export const ProductComparisonSection: React.FC<ProductComparisonSectionProps> =
                         ★ Harga Paling Penjimatan
                       </span>
                     )}
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Row: Made In & Tahun Keluaran */}
+            <tr className="hover:bg-slate-50 transition-colors bg-slate-50/30">
+              <td className="p-4 font-bold text-slate-700 bg-slate-50/50">Made In & Tahun</td>
+              {comparisonList.map((tire) => {
+                const madeIn = getTireMadeIn(tire);
+                const flag = getTireCountryFlag(madeIn);
+                const text = getTireMadeInAndYear(tire);
+                return (
+                  <td key={tire.id} className="p-4 text-center border-l border-slate-200">
+                    <span className="inline-flex items-center gap-1 bg-slate-900 text-white text-xs font-black px-2.5 py-1 rounded shadow-xs uppercase font-mono">
+                      <span>{flag}</span>
+                      <span>{text}</span>
+                    </span>
                   </td>
                 );
               })}

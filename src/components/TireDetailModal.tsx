@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { X, ShieldCheck, Info, Layers, Ruler, PlusCircle, GitCompare, Warehouse, CheckCircle2, DollarSign, Cpu, ZoomIn, Activity, Sparkles, Droplets, Volume2, Link2, FileCode, ImageIcon } from "lucide-react";
+import { X, ShieldCheck, Info, Layers, Ruler, PlusCircle, GitCompare, Warehouse, CheckCircle2, DollarSign, Cpu, ZoomIn, Activity, Sparkles, Droplets, Volume2, Link2, FileCode, ImageIcon, Tag, Percent, Flame } from "lucide-react";
 import { Tire, UserPersona } from "../types/tyre";
 import { resolveTireImageUrl, getTireStudioMeta, CATEGORY_FALLBACK_IMAGES, DEFAULT_TIRE_PLACEHOLDER } from "../utils/tireImageResolver";
+import { getTirePriceDetails } from "../utils/tireDiscount";
+import { getTireMadeIn, getTireMadeInAndYear, getTireCountryFlag } from "../utils/tireOrigin";
 
 interface TireDetailModalProps {
   tire: Tire | null;
@@ -11,6 +13,7 @@ interface TireDetailModalProps {
   onToggleCompare: (tire: Tire) => void;
   isCompared: boolean;
   onUpdateStock?: (tireId: string, newStock: number) => void;
+  onUpdateDiscount?: (tireId: string, discountPercent: number, discountPrice?: number, discountLabel?: string) => void;
 }
 
 export const TireDetailModal: React.FC<TireDetailModalProps> = ({
@@ -21,12 +24,32 @@ export const TireDetailModal: React.FC<TireDetailModalProps> = ({
   onToggleCompare,
   isCompared,
   onUpdateStock,
+  onUpdateDiscount,
 }) => {
   const [isZoomed, setIsZoomed] = useState(false);
+  const [customDiscountPct, setCustomDiscountPct] = useState<string>("");
   if (!tire) return null;
 
   const resolvedImgUrl = resolveTireImageUrl(tire);
   const studioMeta = getTireStudioMeta(tire);
+  const priceDetails = getTirePriceDetails(tire);
+  const madeInCountry = getTireMadeIn(tire);
+  const originFlag = getTireCountryFlag(madeInCountry);
+  const madeInAndYear = getTireMadeInAndYear(tire);
+
+  const handleApplyDiscount = (pct: number) => {
+    if (onUpdateDiscount) {
+      onUpdateDiscount(tire.id, pct);
+    }
+  };
+
+  const handleApplyCustom = () => {
+    const val = parseInt(customDiscountPct, 10);
+    if (!isNaN(val) && val >= 0 && val <= 90 && onUpdateDiscount) {
+      onUpdateDiscount(tire.id, val);
+      setCustomDiscountPct("");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
@@ -45,9 +68,19 @@ export const TireDetailModal: React.FC<TireDetailModalProps> = ({
             <span className="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded bg-red-600 text-white shadow-xs">
               {tire.brand}
             </span>
+            <span className="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded bg-slate-900 text-white shadow-xs flex items-center gap-1">
+              <span>{originFlag}</span>
+              <span>{madeInCountry} {tire.year || 2026}</span>
+            </span>
             <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
               {tire.category}
             </span>
+            {priceDetails.hasDiscount && (
+              <span className="text-xs font-black px-2.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-300 flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-red-600" />
+                {priceDetails.discountLabel || `Diskaun ${priceDetails.discountPercent}%`}
+              </span>
+            )}
             <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
               Stok Kedai: {tire.storeStock} Biji
             </span>
@@ -126,20 +159,20 @@ export const TireDetailModal: React.FC<TireDetailModalProps> = ({
 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 text-xs font-mono">
                   <div className="bg-white/5 p-2 rounded-lg border border-white/5">
+                    <span className="text-[10px] text-slate-400 block font-sans">Made In (Buatan)</span>
+                    <strong className="text-emerald-400 font-bold text-sm">{originFlag} {madeInCountry}</strong>
+                  </div>
+                  <div className="bg-white/5 p-2 rounded-lg border border-white/5">
+                    <span className="text-[10px] text-slate-400 block font-sans">Tahun Keluaran</span>
+                    <strong className="text-amber-400 font-bold text-sm">{tire.year || 2026}</strong>
+                  </div>
+                  <div className="bg-white/5 p-2 rounded-lg border border-white/5">
                     <span className="text-[10px] text-slate-400 block font-sans">Bunga Baru</span>
-                    <strong className="text-emerald-400 font-bold text-sm">{tire.treadDepthMm} mm</strong> (100%)
+                    <strong className="text-blue-400 font-bold text-sm">{tire.treadDepthMm} mm</strong> (100%)
                   </div>
                   <div className="bg-white/5 p-2 rounded-lg border border-white/5">
-                    <span className="text-[10px] text-slate-400 block font-sans">Prestasi Basah</span>
-                    <strong className="text-blue-400 font-bold text-sm">Gred {tire.wetGripRating}</strong>
-                  </div>
-                  <div className="bg-white/5 p-2 rounded-lg border border-white/5">
-                    <span className="text-[10px] text-slate-400 block font-sans">Bunyi Jalan</span>
-                    <strong className="text-amber-400 font-bold text-sm">{tire.noiseLevelDb} dB</strong>
-                  </div>
-                  <div className="bg-white/5 p-2 rounded-lg border border-white/5">
-                    <span className="text-[10px] text-slate-400 block font-sans">Penjimatan Minyak</span>
-                    <strong className="text-purple-400 font-bold text-sm">Gred {tire.fuelSavingRating}</strong>
+                    <span className="text-[10px] text-slate-400 block font-sans">Jangka Hayat</span>
+                    <strong className="text-purple-400 font-bold text-sm">{tire.treadLifeKm.toLocaleString()} KM</strong>
                   </div>
                 </div>
               </div>
@@ -153,6 +186,14 @@ export const TireDetailModal: React.FC<TireDetailModalProps> = ({
             </h3>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <span className="text-slate-500 block text-[10px]">Made In (Buatan)</span>
+                <strong className="text-slate-900 font-mono font-bold flex items-center gap-1">{originFlag} {madeInCountry}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px]">Tahun Pembuatan</span>
+                <strong className="text-slate-900 font-mono font-bold">{tire.year || 2026}</strong>
+              </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Lebar Tayar</span>
                 <strong className="text-slate-900 font-mono">{tire.width} mm</strong>
@@ -170,20 +211,12 @@ export const TireDetailModal: React.FC<TireDetailModalProps> = ({
                 <strong className="text-red-600 font-mono font-bold">{tire.treadDepthMm} mm</strong>
               </div>
               <div>
-                <span className="text-slate-500 block text-[10px]">Indeks Beban</span>
-                <strong className="text-slate-900 font-mono">{tire.loadIndex}</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">Rating Kelajuan</span>
-                <strong className="text-slate-900 font-mono">{tire.speedRating}</strong>
+                <span className="text-slate-500 block text-[10px]">Indeks Beban & Kelajuan</span>
+                <strong className="text-slate-900 font-mono">{tire.loadIndex}{tire.speedRating}</strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Jangka Hayat (Km)</span>
                 <strong className="text-slate-900 font-mono">{tire.treadLifeKm.toLocaleString()} KM</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">Tahun Pembuatan</span>
-                <strong className="text-slate-900 font-mono">{tire.year}</strong>
               </div>
             </div>
           </div>
@@ -202,15 +235,34 @@ export const TireDetailModal: React.FC<TireDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Commercial & Stock Management Section */}
+          {/* Commercial, Pricing & Discount Management Section */}
           <div className="pt-2 border-t border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-slate-500 block font-medium">Harga Cadangan Pasaran</span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-red-600">RM{tire.marketPrice}</span>
-                  <span className="text-xs text-slate-500">/biji</span>
-                </div>
+                <span className="text-xs text-slate-500 block font-medium">
+                  {priceDetails.hasDiscount ? "Harga Tawaran Diskaun" : "Harga Cadangan Pasaran"}
+                </span>
+                {priceDetails.hasDiscount ? (
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="line-through text-slate-400 font-mono text-sm font-semibold">
+                        RM{priceDetails.originalPrice}
+                      </span>
+                      <span className="text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">
+                        Jimat RM{priceDetails.savings} ({priceDetails.discountPercent}%)
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-red-600 font-mono">RM{priceDetails.finalPrice}</span>
+                      <span className="text-xs text-slate-500">/biji</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-red-600">RM{tire.marketPrice}</span>
+                    <span className="text-xs text-slate-500">/biji</span>
+                  </div>
+                )}
               </div>
 
               {persona === "Kedai Tayar" && (
@@ -220,6 +272,69 @@ export const TireDetailModal: React.FC<TireDetailModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Admin Discount Setter inside Modal */}
+            {persona === "Kedai Tayar" && onUpdateDiscount && (
+              <div className="bg-red-50/70 border border-red-200 rounded-xl p-3.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-red-950 flex items-center gap-1.5 text-xs">
+                    <Flame className="w-4 h-4 text-red-600" /> Tetapkan Diskaun Promosi (Admin)
+                  </span>
+                  {priceDetails.hasDiscount && (
+                    <span className="text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded">
+                      Aktif: {priceDetails.discountPercent}% Diskaun
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDiscount(0)}
+                    className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors cursor-pointer ${
+                      !priceDetails.hasDiscount
+                        ? "bg-slate-800 text-white border-slate-800"
+                        : "bg-white text-slate-700 hover:bg-slate-100 border-slate-300"
+                    }`}
+                  >
+                    Tiada (0%)
+                  </button>
+                  {[5, 10, 15, 20, 25].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => handleApplyDiscount(pct)}
+                      className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors cursor-pointer ${
+                        priceDetails.hasDiscount && priceDetails.discountPercent === pct
+                          ? "bg-red-600 text-white border-red-700 shadow-xs"
+                          : "bg-white text-red-700 hover:bg-red-100 border-red-200"
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+
+                  <div className="flex items-center gap-1 ml-auto">
+                    <input
+                      type="number"
+                      min="1"
+                      max="90"
+                      placeholder="Custom %"
+                      value={customDiscountPct}
+                      onChange={(e) => setCustomDiscountPct(e.target.value)}
+                      className="w-20 bg-white border border-slate-200 rounded px-2 py-1 text-slate-900 font-mono text-xs outline-none focus:border-red-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCustom}
+                      className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded transition-colors cursor-pointer"
+                    >
+                      Set %
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Admin Stock Quick Modifier inside Modal */}
             {persona === "Kedai Tayar" && onUpdateStock && (

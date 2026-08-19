@@ -36,10 +36,17 @@ export interface Tire {
   treadLifeKm: number;
   description: string;
   keyTechnologies: string[];
+  madeIn?: string; // e.g. "CHINA", "MALAYSIA", "THAILAND", "JAPAN", "KOREA"
+  countryOfOrigin?: string;
   imageId?: string; // e.g. "TY001", "TY002" from github syncrozz-assets
   imageUrl?: string; // e.g. direct link or github link
   isNewProduct?: boolean;
   isPopular?: boolean;
+  discountPercent?: number; // e.g. 10, 15, 20 (meaning 10%, 15%, 20% discount)
+  discountPrice?: number;   // e.g. 185 (actual selling price after discount)
+  originalPrice?: number;   // base price before discount
+  isDiscounted?: boolean;   // toggle for active discount
+  discountLabel?: string;   // e.g. "Promosi Jimat 15%", "Tawaran Terhad", "Flash Sale"
 }
 
 export interface BrandInfo {

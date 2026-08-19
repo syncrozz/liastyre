@@ -11,6 +11,7 @@ interface PatternSizeDirectorySectionProps {
   onAddToQuotation: (tire: Tire) => void;
   onViewDetail: (tire: Tire) => void;
   onUpdateStock?: (tireId: string, newStock: number) => void;
+  onUpdateDiscount?: (tireId: string, discountPercent: number, discountPrice?: number, discountLabel?: string) => void;
 }
 
 export const PatternSizeDirectorySection: React.FC<PatternSizeDirectorySectionProps> = ({
@@ -21,6 +22,7 @@ export const PatternSizeDirectorySection: React.FC<PatternSizeDirectorySectionPr
   onAddToQuotation,
   onViewDetail,
   onUpdateStock,
+  onUpdateDiscount,
 }) => {
   const [activeTab, setActiveTab] = useState<"pattern" | "size">("pattern");
   
@@ -265,6 +267,7 @@ export const PatternSizeDirectorySection: React.FC<PatternSizeDirectorySectionPr
                 isCompared={isCompared}
                 onToggleCompare={onToggleCompare}
                 onAddToQuotation={onAddToQuotation}
+                onUpdateDiscount={onUpdateDiscount}
               />
             );
           })}

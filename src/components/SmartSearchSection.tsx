@@ -13,19 +13,23 @@ import {
   Sparkles,
   TrendingUp,
   Tag,
-  Warehouse
+  Warehouse,
+  Percent,
+  Flame
 } from "lucide-react";
 import { Tire, UserPersona } from "../types/tyre";
 import { TireCardShowcase } from "./TireCardShowcase";
+import { getTirePriceDetails } from "../utils/tireDiscount";
 
 interface SmartSearchSectionProps {
   tyres: Tire[];
   persona: UserPersona;
   comparisonList: Tire[];
-  onToggleCompare: (tire: Tire) => void;
-  onAddToQuotation: (tire: Tire) => void;
-  onViewDetail: (tire: Tire) => void;
+  onToggleCompare: (tire) => void;
+  onAddToQuotation: (tire) => void;
+  onViewDetail: (tire) => void;
   onUpdateStock?: (tireId: string, newStock: number) => void;
+  onUpdateDiscount?: (tireId: string, discountPercent: number, discountPrice?: number, discountLabel?: string) => void;
 }
 
 export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
@@ -36,6 +40,7 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
   onAddToQuotation,
   onViewDetail,
   onUpdateStock,
+  onUpdateDiscount,
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("ALL");
@@ -43,7 +48,18 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
   const [selectedRim, setSelectedRim] = useState<string>("ALL");
   const [maxPrice, setMaxPrice] = useState<number>(700);
   const [onlyInStock, setOnlyInStock] = useState<boolean>(false);
+  const [onlyDiscounted, setOnlyDiscounted] = useState<boolean>(false);
   const [selectedPatternKeyword, setSelectedPatternKeyword] = useState<string>("ALL");
+
+  // Calculate discount statistics and brands with active discounts
+  const { totalDiscountedItems, brandsWithDiscount } = useMemo(() => {
+    const discountedItems = tyres.filter((t) => getTirePriceDetails(t).hasDiscount);
+    const brands = Array.from(new Set(discountedItems.map((t) => t.brand)));
+    return {
+      totalDiscountedItems: discountedItems.length,
+      brandsWithDiscount: brands,
+    };
+  }, [tyres]);
 
   // Dynamic filter lists
   const allBrands = useMemo(() => {
@@ -70,9 +86,9 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
     { label: "265/65R17 (4x4)", query: "265/65R17" },
     { label: "Michelin", query: "Michelin" },
     { label: "Goodyear", query: "Goodyear" },
-    { label: "Hankook", query: "Hankook" },
-    { label: "Cengkaman Basah / Wet Grip", query: "Wet" },
-    { label: "Senyap & Selesa / Comfort", query: "Comfort" },
+    { label: "Continental", query: "Continental" },
+    { label: "Cengkaman Basah", query: "Wet" },
+    { label: "Senyap & Selesa", query: "Comfort" },
   ];
 
   // Smart Search logic
@@ -80,6 +96,13 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
     const term = searchTerm.trim().toLowerCase();
 
     return tyres.filter((tire) => {
+      const priceDetails = getTirePriceDetails(tire);
+
+      // Discount Filter
+      if (onlyDiscounted && !priceDetails.hasDiscount) {
+        return false;
+      }
+
       // Free form smart search across size, brand, model, pattern, category, technologies
       if (term) {
         const fullString = `${tire.size} ${tire.brand} ${tire.model} ${tire.pattern} ${tire.category} ${tire.keyTechnologies.join(" ")} ${tire.description} ${tire.year}`.toLowerCase();
@@ -117,8 +140,8 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
         }
       }
 
-      // Max Price Filter
-      if (tire.marketPrice > maxPrice) {
+      // Max Price Filter (checks against discounted final price)
+      if (priceDetails.finalPrice > maxPrice) {
         return false;
       }
 
@@ -129,7 +152,7 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
 
       return true;
     });
-  }, [tyres, searchTerm, selectedBrand, selectedCategory, selectedRim, selectedPatternKeyword, maxPrice, onlyInStock]);
+  }, [tyres, searchTerm, selectedBrand, selectedCategory, selectedRim, selectedPatternKeyword, maxPrice, onlyInStock, onlyDiscounted]);
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -139,6 +162,7 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
     setSelectedPatternKeyword("ALL");
     setMaxPrice(700);
     setOnlyInStock(false);
+    setOnlyDiscounted(false);
   };
 
   return (
@@ -155,8 +179,24 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
             </p>
           </div>
           
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200 font-medium">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Discount Toggle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setOnlyDiscounted(!onlyDiscounted);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shadow-xs border cursor-pointer ${
+                onlyDiscounted
+                  ? "bg-red-600 text-white border-red-700 ring-2 ring-red-400"
+                  : "bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+              }`}
+            >
+              <Flame className={`w-3.5 h-3.5 ${onlyDiscounted ? "text-amber-300" : "text-red-600"}`} />
+              Promosi Diskaun ({totalDiscountedItems})
+            </button>
+
+            <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 font-bold">
               {filteredTyres.length} Tayar Ditemui
             </span>
           </div>
@@ -184,6 +224,55 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
           )}
         </div>
 
+        {/* Quick Discount Brands Filter Bar */}
+        {brandsWithDiscount.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs bg-red-50/60 p-2 rounded-lg border border-red-100">
+            <span className="text-red-700 font-extrabold whitespace-nowrap flex items-center gap-1 shrink-0">
+              <Flame className="w-3.5 h-3.5 text-red-600" /> Tapis Jenama Berdiskaun:
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setOnlyDiscounted(true);
+                setSelectedBrand("ALL");
+              }}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                onlyDiscounted && selectedBrand === "ALL"
+                  ? "bg-red-600 text-white border-red-700"
+                  : "bg-white text-red-700 border-red-200 hover:bg-red-100"
+              }`}
+            >
+              Semua Diskaun ({totalDiscountedItems})
+            </button>
+            {brandsWithDiscount.map((brand) => {
+              const brandDiscountCount = tyres.filter(
+                (t) => t.brand.toUpperCase() === brand.toUpperCase() && getTirePriceDetails(t).hasDiscount
+              ).length;
+
+              return (
+                <button
+                  key={brand}
+                  type="button"
+                  onClick={() => {
+                    setSelectedBrand(brand);
+                    setOnlyDiscounted(true);
+                  }}
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer flex items-center gap-1 ${
+                    onlyDiscounted && selectedBrand.toUpperCase() === brand.toUpperCase()
+                      ? "bg-red-600 text-white border-red-700 shadow-xs"
+                      : "bg-white text-slate-800 border-slate-200 hover:border-red-300 hover:bg-red-50/50"
+                  }`}
+                >
+                  <span>{brand}</span>
+                  <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.2 rounded-full font-mono">
+                    {brandDiscountCount} Promo
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Preset Shortcuts */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
           <span className="text-slate-500 font-semibold whitespace-nowrap flex items-center gap-1">
@@ -201,7 +290,7 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
         </div>
 
         {/* Filter Bar Controls */}
-        <div className="pt-3 border-t border-slate-100 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
           {/* Brand Dropdown */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Jenama</label>
@@ -210,9 +299,14 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
               onChange={(e) => setSelectedBrand(e.target.value)}
               className="w-full bg-slate-50 text-slate-800 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:border-red-500 focus:bg-white outline-none"
             >
-              {allBrands.map((b) => (
-                <option key={b} value={b}>{b === "ALL" ? "Semua Jenama" : b}</option>
-              ))}
+              {allBrands.map((b) => {
+                const hasDiscount = b !== "ALL" && brandsWithDiscount.includes(b);
+                return (
+                  <option key={b} value={b}>
+                    {b === "ALL" ? "Semua Jenama" : `${b}${hasDiscount ? " 🔥 (Diskaun)" : ""}`}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -261,8 +355,20 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
             />
           </div>
 
-          {/* In Stock & Clear Toggle */}
-          <div className="flex items-center justify-between gap-2 pt-4 md:pt-0">
+          {/* In Stock & Discount Toggles */}
+          <div className="flex flex-col justify-center gap-1.5 pt-1">
+            <label className="flex items-center gap-1.5 text-xs text-slate-700 font-bold cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={onlyDiscounted}
+                onChange={(e) => setOnlyDiscounted(e.target.checked)}
+                className="rounded border-slate-300 bg-white text-red-600 focus:ring-red-500"
+              />
+              <span className="text-red-600 flex items-center gap-1">
+                🔥 Ada Diskaun
+              </span>
+            </label>
+
             <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -272,17 +378,36 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
               />
               <span>Stok Sedia Ada</span>
             </label>
+          </div>
 
-            {(searchTerm || selectedBrand !== "ALL" || selectedCategory !== "ALL" || selectedRim !== "ALL" || maxPrice < 700 || onlyInStock) && (
+          {/* Reset Action */}
+          <div className="flex items-center justify-end">
+            {(searchTerm || selectedBrand !== "ALL" || selectedCategory !== "ALL" || selectedRim !== "ALL" || maxPrice < 700 || onlyInStock || onlyDiscounted) && (
               <button
+                type="button"
                 onClick={clearFilters}
-                className="text-xs text-rose-600 hover:text-rose-700 font-semibold underline underline-offset-2 flex items-center gap-1"
+                className="text-xs text-rose-600 hover:text-rose-700 font-bold underline underline-offset-2 flex items-center gap-1 p-1"
               >
-                <X className="w-3 h-3" /> Reset
+                <X className="w-3.5 h-3.5" /> Reset Semua
               </button>
             )}
           </div>
         </div>
+
+        {/* Admin Guidance Helper Banner */}
+        {persona === "Kedai Tayar" && (
+          <div className="bg-amber-50 border border-amber-200/80 rounded-lg p-3 text-xs text-amber-900 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Mod Admin Aktif:</strong> Anda boleh menetapkan tawaran diskaun (cth: 10%, 15%, 20%) terus pada mana-mana kad tayar di bawah menggunakan butang <span className="font-bold text-red-600 bg-white px-1.5 py-0.5 rounded border border-amber-300">+ Set Diskaun</span>.
+              </span>
+            </div>
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded whitespace-nowrap">
+              {totalDiscountedItems} Item Berdiskaun
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Results Display Grid */}
@@ -294,12 +419,14 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
           <div>
             <h3 className="text-lg font-bold text-slate-800">Tiada Padanan Tayar Ditemui</h3>
             <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">
-              Sila cuba taipkan kata kunci saiz yang lebih umum seperti <span className="text-red-600 font-mono font-bold">205/55</span> atau turunkan tetapan carian.
+              {onlyDiscounted 
+                ? "Tiada tayar berdiskaun ditemui dengan penapis semasa. Sila cuba pilih jenama lain atau nyah-pilih penapis diskaun."
+                : "Sila cuba taipkan kata kunci saiz yang lebih umum seperti 205/55 atau turunkan tetapan carian."}
             </p>
           </div>
           <button
             onClick={clearFilters}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition-colors inline-flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition-colors inline-flex items-center gap-2 shadow-sm cursor-pointer"
           >
             Reset Semua Penapis
           </button>
@@ -318,6 +445,7 @@ export const SmartSearchSection: React.FC<SmartSearchSectionProps> = ({
                 isCompared={isCompared}
                 onToggleCompare={onToggleCompare}
                 onAddToQuotation={onAddToQuotation}
+                onUpdateDiscount={onUpdateDiscount}
               />
             );
           })}

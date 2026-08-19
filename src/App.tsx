@@ -11,6 +11,7 @@ import { AiTyreAdvisorSection } from "./components/AiTyreAdvisorSection";
 import { TireDetailModal } from "./components/TireDetailModal";
 import { INITIAL_TYRES } from "./data/tyresData";
 import { Tire, NavTab, UserPersona, QuotationItem } from "./types/tyre";
+import { getTirePriceDetails } from "./utils/tireDiscount";
 import {
   db,
   collection,
@@ -20,21 +21,35 @@ import {
   writeBatch
 } from "./lib/firebase";
 
-const LOCAL_STORAGE_TYRES_KEY = "liastyre_pro_inventory_v1";
+const LOCAL_STORAGE_TYRES_KEY = "liastyre_pro_inventory_v3";
+
+function ensureUniqueIds(list: Tire[]): Tire[] {
+  const seen = new Set<string>();
+  return list.map((t, idx) => {
+    let uniqueId = t.id || `SKU-${idx}`;
+    let counter = 1;
+    while (seen.has(uniqueId)) {
+      uniqueId = `${t.id || `SKU-${idx}`}-dup${counter}`;
+      counter++;
+    }
+    seen.add(uniqueId);
+    return uniqueId !== t.id ? { ...t, id: uniqueId } : t;
+  });
+}
 
 function getStoredTyres(): Tire[] {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_TYRES_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed) && parsed.length >= 100) {
+        return ensureUniqueIds(parsed);
       }
     }
   } catch (e) {
     console.warn("Failed to load inventory from local cache:", e);
   }
-  return INITIAL_TYRES;
+  return ensureUniqueIds(INITIAL_TYRES);
 }
 
 function saveStoredTyres(data: Tire[]) {
@@ -138,6 +153,7 @@ export default function App() {
 
   // Add to Quotation
   const handleAddToQuotation = (tire: Tire) => {
+    const priceDetails = getTirePriceDetails(tire);
     setQuotationItems((prev) => {
       const existingIndex = prev.findIndex((item) => item.tireId === tire.id);
       if (existingIndex > -1) {
@@ -151,7 +167,7 @@ export default function App() {
             tireId: tire.id,
             tire: tire,
             quantity: 4, // Default 4 tires for a full set
-            unitPrice: tire.marketPrice,
+            unitPrice: priceDetails.finalPrice,
             installationFeePerTire: 10,
             balancingFeePerTire: 10,
           },
@@ -180,6 +196,40 @@ export default function App() {
 
   const handleClearQuotation = () => {
     setQuotationItems([]);
+  };
+
+  // Update Discount
+  const handleUpdateDiscount = async (
+    tireId: string,
+    discountPercent: number,
+    discountPrice?: number,
+    discountLabel?: string
+  ) => {
+    const target = tyres.find((t) => t.id === tireId);
+    if (!target) return;
+
+    const isDiscounted = discountPercent > 0 || Boolean(discountPrice && discountPrice > 0);
+    const updatedTire: Tire = {
+      ...target,
+      isDiscounted,
+      discountPercent: discountPercent > 0 ? discountPercent : 0,
+      discountPrice: discountPrice && discountPrice > 0 ? discountPrice : undefined,
+      discountLabel: discountLabel || (isDiscounted ? `Diskaun ${discountPercent}%` : undefined),
+    };
+
+    const updated = tyres.map((t) => (t.id === tireId ? updatedTire : t));
+    setTyres(updated);
+    saveStoredTyres(updated);
+
+    if (selectedDetailTire && selectedDetailTire.id === tireId) {
+      setSelectedDetailTire(updatedTire);
+    }
+
+    try {
+      await setDoc(doc(db, "tyres", tireId), updatedTire);
+    } catch (err) {
+      console.warn("Cloud update discount notice:", err);
+    }
   };
 
   // Import Bulk Tyres from CSV / Excel to Cloud + Local Cache
@@ -242,11 +292,12 @@ export default function App() {
   const handleUpdateStock = async (tireId: string, newStock: number) => {
     const target = tyres.find((t) => t.id === tireId);
     if (!target) return;
+    const newTotal = newStock + (target.supplierStockNexen || 0) + (target.supplierStockGoodyear || 0);
     const updatedTire: Tire = {
       ...target,
       storeStock: newStock,
-      totalStock: newStock,
-      status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : "In Stock",
+      totalStock: newTotal,
+      status: newTotal <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : "In Stock",
     };
     const updated = tyres.map((t) => (t.id === tireId ? updatedTire : t));
     setTyres(updated);
@@ -261,29 +312,32 @@ export default function App() {
 
   // Sync Master Data Stock
   const handleSyncMasterStock = async (mode: "standard" | "popular" | "reset" | "custom", customQty: number = 10) => {
-    const updated = tyres.map((t) => {
-      let newStock = t.storeStock;
-      if (mode === "reset") {
-        const original = INITIAL_TYRES.find((init) => init.id === t.id);
-        newStock = original ? original.storeStock : 10;
-      } else if (mode === "standard") {
-        newStock = 12; // Standard shop baseline stock
-      } else if (mode === "popular") {
-        if (t.size.includes("205/55") || t.size.includes("185/65") || t.size.includes("215/55") || t.size.includes("195/65")) {
-          newStock = 24;
-        } else {
-          newStock = 8;
+    let updated: Tire[] = [];
+    if (mode === "reset") {
+      updated = INITIAL_TYRES;
+    } else {
+      updated = tyres.map((t) => {
+        let newStoreStock = t.storeStock;
+        if (mode === "standard") {
+          newStoreStock = 12; // Standard shop baseline stock
+        } else if (mode === "popular") {
+          if (t.size.includes("205/55") || t.size.includes("185/65") || t.size.includes("215/55") || t.size.includes("195/65")) {
+            newStoreStock = 24;
+          } else {
+            newStoreStock = 8;
+          }
+        } else if (mode === "custom") {
+          newStoreStock = Math.max(0, customQty);
         }
-      } else if (mode === "custom") {
-        newStock = Math.max(0, customQty);
-      }
-      return {
-        ...t,
-        storeStock: newStock,
-        totalStock: newStock,
-        status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : ("In Stock" as const),
-      };
-    });
+        const newTotal = newStoreStock + (t.supplierStockNexen || 0) + (t.supplierStockGoodyear || 0);
+        return {
+          ...t,
+          storeStock: newStoreStock,
+          totalStock: newTotal,
+          status: newTotal <= 0 ? "Out of Stock" : newStoreStock <= 2 ? "Low Stock" : ("In Stock" as const),
+        };
+      });
+    }
 
     setTyres(updated);
     saveStoredTyres(updated);
@@ -304,12 +358,13 @@ export default function App() {
     const updated = tyres.map((t) => {
       const deductItem = itemsToDeduct.find((item) => item.tireId === t.id);
       if (deductItem) {
-        const newStock = Math.max(0, t.storeStock - deductItem.quantity);
+        const newStoreStock = Math.max(0, t.storeStock - deductItem.quantity);
+        const newTotal = newStoreStock + (t.supplierStockNexen || 0) + (t.supplierStockGoodyear || 0);
         return {
           ...t,
-          storeStock: newStock,
-          totalStock: newStock,
-          status: newStock <= 0 ? "Out of Stock" : newStock <= 2 ? "Low Stock" : ("In Stock" as const),
+          storeStock: newStoreStock,
+          totalStock: newTotal,
+          status: newTotal <= 0 ? "Out of Stock" : newStoreStock <= 2 ? "Low Stock" : ("In Stock" as const),
         };
       }
       return t;
@@ -357,6 +412,7 @@ export default function App() {
             onAddToQuotation={handleAddToQuotation}
             onViewDetail={(tire) => setSelectedDetailTire(tire)}
             onUpdateStock={handleUpdateStock}
+            onUpdateDiscount={handleUpdateDiscount}
           />
         )}
 
@@ -369,6 +425,7 @@ export default function App() {
             onAddToQuotation={handleAddToQuotation}
             onViewDetail={(tire) => setSelectedDetailTire(tire)}
             onUpdateStock={handleUpdateStock}
+            onUpdateDiscount={handleUpdateDiscount}
           />
         )}
 
@@ -381,6 +438,7 @@ export default function App() {
             onAddToQuotation={handleAddToQuotation}
             onViewDetail={(tire) => setSelectedDetailTire(tire)}
             onUpdateStock={handleUpdateStock}
+            onUpdateDiscount={handleUpdateDiscount}
           />
         )}
 
@@ -393,6 +451,7 @@ export default function App() {
             onAddToQuotation={handleAddToQuotation}
             onViewDetail={(tire) => setSelectedDetailTire(tire)}
             onUpdateStock={handleUpdateStock}
+            onUpdateDiscount={handleUpdateDiscount}
           />
         )}
 
@@ -426,6 +485,7 @@ export default function App() {
             onUpdateStock={handleUpdateStock}
             onSyncMasterStock={handleSyncMasterStock}
             onImportBulkTyres={handleImportBulkTyres}
+            onUpdateDiscount={handleUpdateDiscount}
           />
         )}
 
@@ -459,6 +519,7 @@ export default function App() {
           onToggleCompare={handleToggleCompare}
           isCompared={comparisonList.some((t) => t.id === selectedDetailTire.id)}
           onUpdateStock={handleUpdateStock}
+          onUpdateDiscount={handleUpdateDiscount}
         />
       )}
     </div>

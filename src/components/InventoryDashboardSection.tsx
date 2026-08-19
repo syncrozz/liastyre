@@ -1,7 +1,30 @@
-import React, { useState } from "react";
-import { BarChart3, Warehouse, DollarSign, TrendingUp, AlertTriangle, Plus, PackageCheck, Layers, RefreshCw, CheckCircle2, Sparkles, FolderSync, ShieldCheck, HelpCircle, FileSpreadsheet, UploadCloud, FileText, Download } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import {
+  BarChart3,
+  Warehouse,
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  Plus,
+  PackageCheck,
+  Layers,
+  RefreshCw,
+  CheckCircle2,
+  Sparkles,
+  FolderSync,
+  ShieldCheck,
+  HelpCircle,
+  FileSpreadsheet,
+  UploadCloud,
+  FileText,
+  Download,
+  Search,
+  Building2,
+  Boxes
+} from "lucide-react";
 import { Tire, UserPersona, TireStatus, CategoryType } from "../types/tyre";
 import { LIAS_TYRE_CSV_SAMPLE_RAW } from "../data/csvSampleData";
+import { parseCSVTextToTyres, extractBrandAndModel, normalizeSize } from "../utils/csvParser";
 
 interface InventoryDashboardSectionProps {
   tyres: Tire[];
@@ -11,41 +34,6 @@ interface InventoryDashboardSectionProps {
   onSyncMasterStock?: (mode: "standard" | "popular" | "reset" | "custom", customQty?: number) => void;
   onImportBulkTyres?: (importedTyres: Tire[]) => void;
 }
-
-const KNOWN_BRANDS = [
-  "MICHELIN", "GOODYEAR", "HANKOOK", "CONTINENTAL", "NEXEN", "TOYO",
-  "AUTOGREEN", "DURATURN", "KINGBOSS", "DURUN", "GEPORMAX", "BRIDGESTONE",
-  "LINGLONG", "NEOLIN", "AEROFORCE", "LEAO", "LAUFENN", "YOKOHAMA",
-  "ATLANDER", "WESTLAKE", "LANVIGATOR", "ROADX", "GRIPMAX"
-];
-
-// Helper to extract brand and model cleanly from strings like "GOODYEAR ADP2 2026", "LING LONG 2025"
-const extractBrandAndModel = (rawStr: string): { brand: string; model: string } => {
-  let s = (rawStr || "").trim().replace(/\s+/g, " ");
-  s = s.replace(/^GOOD\s+YEAR/i, "GOODYEAR");
-  s = s.replace(/^LING\s+LONG/i, "LINGLONG");
-  s = s.replace(/^WEST\s+LAKE/i, "WESTLAKE");
-  s = s.replace(/^(LION\s+SPORT\s+A\/T\s+LEAO|LION\s+LEAO\s+SPORT|LEO\s+LION\s+SPORT|LEAO\s+LION\s+TYRE)/i, "LEAO");
-  s = s.replace(/^SMART\s+CHASER/i, "AUTOGREEN SMART CHASER");
-  s = s.replace(/^VANPLUS\s+ATLANDER/i, "ATLANDER");
-  s = s.replace(/^CATCHFORS\s+AT\s+LANVIGATOR/i, "LANVIGATOR");
-
-  const parts = s.split(" ");
-  let matchedBrand = parts[0] ? parts[0].toUpperCase() : "GENERIC";
-  let modelParts = parts.slice(1);
-
-  for (const b of KNOWN_BRANDS) {
-    if (s.toUpperCase().startsWith(b)) {
-      matchedBrand = b;
-      const rest = s.slice(b.length).trim();
-      modelParts = rest ? rest.split(" ") : [modelParts.join(" ")];
-      break;
-    }
-  }
-
-  const modelName = modelParts.join(" ") || "Standard Series";
-  return { brand: matchedBrand, model: modelName };
-};
 
 export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps> = ({
   tyres,
@@ -62,6 +50,10 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
   const [customQtyInput, setCustomQtyInput] = useState(15);
   const [selectedSyncMode, setSelectedSyncMode] = useState<"standard" | "popular" | "reset" | "custom">("standard");
 
+  // Table Search & Filtering State
+  const [searchFilter, setSearchFilter] = useState("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("ALL");
+
   // CSV Import State
   const [csvText, setCsvText] = useState("");
   const [parsedPreview, setParsedPreview] = useState<Tire[]>([]);
@@ -76,353 +68,81 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
   const [marketPrice, setMarketPrice] = useState(350);
   const [costPrice, setCostPrice] = useState(280);
   const [storeStock, setStoreStock] = useState(10);
-
-  // Normalize Size Format (e.g., "155.70.12" -> "155/70R12", "175.R.13C" -> "175R13C", "215.75.17.5" -> "215/75R17.5")
-  const normalizeSize = (rawSize: string): string => {
-    if (!rawSize) return "205/55R16";
-    let s = rawSize.trim();
-    if (s.includes("/") && s.includes("R")) return s.toUpperCase();
-
-    // Commercial R format: 175.R.13C, 185.R.14C, 195.R.15C, 165.R.14C
-    if (/^\d+\.R\.\d+/i.test(s)) {
-      return s.replace(/^(\d+)\.R\.(\d+.*)$/i, "$1R$2").toUpperCase();
-    }
-    // Commercial R format: 185.R14C, 195.R15C, 195.R.15
-    if (/^\d+\.R\d+/i.test(s)) {
-      return s.replace(/^(\d+)\.R(\d+.*)$/i, "$1R$2").toUpperCase();
-    }
-    // Decimal rim format: 215.75.17.5 -> 215/75R17.5
-    if (/^\d+\.\d+\.\d+\.\d+/.test(s)) {
-      const parts = s.split(".");
-      return `${parts[0]}/${parts[1]}R${parts[2]}.${parts[3]}`.toUpperCase();
-    }
-    // Standard format: 155.70.12 -> 155/70R12 or 215.70.16C -> 215/70R16C
-    if (/^\d+\.\d+\.\d+/.test(s)) {
-      const parts = s.split(".");
-      const width = parts[0];
-      const aspect = parts[1];
-      const rest = parts.slice(2).join("");
-      return `${width}/${aspect}R${rest}`.toUpperCase();
-    }
-
-    s = s.replace(/^(\d+)\.(R\d+.*)$/i, "$1R$2");
-    s = s.replace(/^(\d+)\.(\d+)\.(\d+)(.*)$/, "$1/$2R$3$4");
-    return s.toUpperCase();
-  };
-
-  // Helper to parse line with CSV quotes
-  const parseCsvRow = (line: string): string[] => {
-    const result: string[] = [];
-    let cur = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === "," && !inQuotes) {
-        result.push(cur.trim());
-        cur = "";
-      } else {
-        cur += char;
-      }
-    }
-    result.push(cur.trim());
-    return result;
-  };
-
-  // Parse CSV text to Tire array matching latest 15-column format
-  const parseCSVTextToTyres = (raw: string): Tire[] => {
-    const lines = raw
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-    if (lines.length === 0) return [];
-
-    let startIdx = 0;
-    const firstLine = lines[0].toUpperCase();
-    const isHeader =
-      firstLine.includes("SIZE") ||
-      firstLine.includes("BRAND") ||
-      firstLine.includes("HARGA") ||
-      firstLine.includes("TEBAL") ||
-      firstLine.includes("MARKET_PRICE");
-
-    if (isHeader) {
-      startIdx = 1; // Header row
-    }
-
-    const tyresList: Tire[] = [];
-
-    for (let i = startIdx; i < lines.length; i++) {
-      const cols = parseCsvRow(lines[i]);
-      if (cols.length < 3) continue;
-
-      let rawBrandId = "";
-      let rowSeq = i;
-      let rawSize = "";
-      let rawBrandFull = "";
-      let treadDepth = 7.5;
-      let nexenStock = 0;
-      let goodyearStock = 0;
-      let storeStockVal = 0;
-      let totalStockVal = 0;
-      let mktPriceVal = 180;
-      let costPriceVal = 140;
-
-      // Handle user's 15-column template structure:
-      // Index 0: BRAND ID (e.g. '', '1.00', 'BR001')
-      // Index 1: NO (e.g. '1', '2', '3')
-      // Index 2: SIZE TAYAR (e.g. '155.70.12', '175.65.14', '175.R.13C', '215.75.17.5')
-      // Index 3: BRAND (e.g. 'GEPORMAX ECOPLUS HP 2026', 'GOODYEAR ADP2 2026')
-      // Index 4: TEBAL - MM (e.g. '5.60')
-      // Index 5: NEXEN TDU
-      // Index 6: GOODYEAR
-      // Index 7: STORE TMD
-      // Index 8: TOTAL STOK
-      // Index 9: HARGA MARKET - REGULAR 1
-      // Index 10: HARGA MARKET - NEW 2
-      // Index 11: HARGA STOK (Cost)
-      // Index 12: NEW PROFIT nov 25
-      // Index 13: TOTAL STOK VALUE
-      // Index 14: SOLD VALUE
-      if (cols.length >= 10 && (cols[2].includes(".") || cols[2].includes("/") || cols[2].toUpperCase().includes("R"))) {
-        rawBrandId = cols[0] || "";
-        rowSeq = parseInt(cols[1]) || i;
-        rawSize = cols[2] || "205/55R16";
-        rawBrandFull = cols[3] || "GOODYEAR Standard Series";
-        treadDepth = parseFloat(cols[4]) || 7.5;
-        nexenStock = parseInt(cols[5]) || 0;
-        goodyearStock = parseInt(cols[6]) || 0;
-        storeStockVal = parseInt(cols[7]) || 0;
-        totalStockVal = parseInt(cols[8]) || (storeStockVal + nexenStock + goodyearStock);
-        mktPriceVal = parseFloat((cols[9] || "0").replace(/,/g, "").replace(/"/g, "")) || 0;
-        if (mktPriceVal === 0 && cols[10]) {
-          mktPriceVal = parseFloat((cols[10] || "0").replace(/,/g, "").replace(/"/g, "")) || 0;
-        }
-        costPriceVal = parseFloat((cols[11] || "0").replace(/,/g, "").replace(/"/g, "")) || (mktPriceVal > 0 ? Math.round(mktPriceVal * 0.75) : 100);
-      } else {
-        // Fallback / legacy format detection
-        rawSize = cols[2] || cols[1] || "";
-        rawBrandFull = cols[3] || cols[2] || "BRAND";
-        treadDepth = parseFloat(cols[4]) || 7.5;
-        totalStockVal = parseInt(cols[11] || cols[8] || cols[7] || "10") || 10;
-        storeStockVal = parseInt(cols[10] || cols[7] || String(totalStockVal)) || totalStockVal;
-        nexenStock = parseInt(cols[8] || cols[5]) || 0;
-        goodyearStock = parseInt(cols[9] || cols[6]) || 0;
-        mktPriceVal = parseFloat((cols[12] || cols[9] || "0").replace(/,/g, "").replace(/"/g, "")) || 180;
-        costPriceVal = parseFloat((cols[13] || cols[11] || "0").replace(/,/g, "").replace(/"/g, "")) || 140;
-      }
-
-      const { brand: brandName, model: modelName } = extractBrandAndModel(rawBrandFull);
-      const formattedSize = normalizeSize(rawSize);
-      const sizeParts = formattedSize.split("/");
-      const width = parseInt(sizeParts[0]) || 205;
-      let aspect = 55;
-      let rim = 16;
-
-      if (sizeParts[1]) {
-        const sub = sizeParts[1].split("R");
-        aspect = parseInt(sub[0]) || 55;
-        rim = parseFloat(sub[1]) || 16;
-      } else if (formattedSize.includes("R")) {
-        const rParts = formattedSize.split("R");
-        rim = parseFloat(rParts[1]) || 14;
-        aspect = 80;
-      }
-
-      // Determine category smartly based on size and model
-      let cat: CategoryType = "Passenger";
-      const fullText = (formattedSize + " " + rawBrandFull).toUpperCase();
-      if (
-        fullText.includes("17.5") ||
-        fullText.includes("VAN") ||
-        fullText.includes("CARGO") ||
-        fullText.includes("RA18") ||
-        fullText.includes("LT") ||
-        fullText.includes("COMMERCIAL") ||
-        fullText.includes("SUMTIRA") ||
-        fullText.includes("CTX") ||
-        formattedSize.toUpperCase().endsWith("C")
-      ) {
-        cat = "Commercial / Van";
-      } else if (
-        fullText.includes("SUV") ||
-        fullText.includes("A/T") ||
-        fullText.includes(" AT ") ||
-        fullText.includes("AT002") ||
-        fullText.includes("AT2") ||
-        fullText.includes("M/T") ||
-        fullText.includes("MT") ||
-        fullText.includes("XTREME") ||
-        fullText.includes("GEOLANDER") ||
-        fullText.includes("D697") ||
-        fullText.includes("DYNAPRO") ||
-        fullText.includes("CROSSWIND A/T") ||
-        fullText.includes("GRANDTOUR") ||
-        fullText.includes("ENTERRA") ||
-        fullText.includes("4X4") ||
-        fullText.includes("OFFROAD") ||
-        (width >= 225 && rim >= 17 && aspect >= 60)
-      ) {
-        cat = fullText.includes("M/T") || fullText.includes("XTREME") || fullText.includes("4X4")
-          ? "4x4 / Offroad"
-          : "SUV / Crossover";
-      } else if (
-        fullText.includes("UHP") ||
-        fullText.includes("SPORT") ||
-        fullText.includes("TR1") ||
-        fullText.includes("EAGLE F1") ||
-        fullText.includes("VENTUS PRIME") ||
-        aspect <= 45
-      ) {
-        cat = "Performance / UHP";
-      }
-
-      // Extract Year if present e.g. 2026, 2025, 2024, 2023, 2021, 2019
-      const yearMatch = rawBrandFull.match(/\b(201\d|202\d)\b/);
-      const tireYear = yearMatch ? parseInt(yearMatch[1]) : 2026;
-
-      const tireId =
-        rawBrandId && rawBrandId.startsWith("BR")
-          ? rawBrandId
-          : `SKU-${rowSeq}-${brandName.slice(0, 3)}-${formattedSize.replace(/[^A-Za-z0-9]/g, "")}`;
-
-      tyresList.push({
-        id: tireId,
-        brandId: brandName.toLowerCase().replace(/[^a-z0-9]/g, ""),
-        brand: brandName,
-        size: formattedSize,
-        width,
-        aspectRatio: aspect,
-        rimSize: Math.floor(rim),
-        model: modelName,
-        pattern: fullText.includes("ROTATION") ? "Directional / Rotation" : "All-Weather Dynamic",
-        category: cat,
-        treadDepthMm: treadDepth,
-        speedRating: aspect <= 45 ? "W" : aspect <= 55 ? "V" : "H",
-        loadIndex: cat === "Commercial / Van" ? 104 : width >= 225 ? 99 : 91,
-        marketPrice: mktPriceVal,
-        costPrice: costPriceVal,
-        profit: mktPriceVal - costPriceVal,
-        storeStock: storeStockVal,
-        supplierStockNexen: nexenStock,
-        supplierStockGoodyear: goodyearStock,
-        totalStock: totalStockVal || storeStockVal,
-        status: storeStockVal <= 0 ? "Out of Stock" : storeStockVal <= 2 ? "Low Stock" : "In Stock",
-        year: tireYear,
-        wetGripRating: mktPriceVal >= 300 ? "A" : "B",
-        noiseLevelDb: aspect <= 45 ? 71 : 68,
-        fuelSavingRating: "B",
-        treadLifeKm: cat === "Commercial / Van" ? 65000 : 50000,
-        description: `Tayar ${brandName} ${modelName} saiz ${formattedSize} spesifikasi rasmi Lias Tyre.`,
-        keyTechnologies: ["Sync Auto-Mapped", "TMD Inventory Certified"]
-      });
-    }
-
-    return tyresList;
-  };
-
-  const handleCsvInputChange = (text: string) => {
-    setCsvText(text);
-    const parsed = parseCSVTextToTyres(text);
-    setParsedPreview(parsed);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const content = evt.target?.result as string;
-      if (content) {
-        handleCsvInputChange(content);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleLoadSampleCSV = () => {
-    handleCsvInputChange(LIAS_TYRE_CSV_SAMPLE_RAW);
-  };
-
-  const handleDownloadCSVTemplate = () => {
-    const csvHeader = "BRAND ID,NO,SIZE TAYAR,BRAND,TEBAL - MM,NEXEN TDU,GOODYEAR,STORE TMD,TOTAL STOK,HARGA MARKET - REGULAR 1,HARGA MARKET - NEW 2,HARGA STOK,NEW PROFIT nov 25,TOTAL STOK VALUE,SOLD VALUE\n";
-    const sampleRows = [
-      ",1,155.70.12,GEPORMAX ECOPLUS HP 2026,5.60,2.00,,6.00,8.00,124.00,134.00,85.00,39.00,680.00,992.00",
-      ",2,175.65.14,GOODYEAR ADP2 2026,7.20,4.00,8.00,17.00,29.00,190.00,200.00,156.00,34.00,4524.00,5510.00",
-      ",3,185.55.15,MICHELIN XM2+ 2026,7.80,,,4.00,4.00,319.00,334.00,273.00,46.00,1092.00,1276.00",
-      ",4,195.55.15,NEXEN N FERA SU4 2026,7.20,4.00,5.00,17.00,26.00,190.00,205.00,149.00,16.00,3874.00,4940.00",
-      ",5,205.55.16,TOYO CR1 2026,7.20,,,6.00,6.00,320.00,340.00,286.00,34.00,1716.00,1920.00",
-      ",6,265.65.17,HANKOOK DYNAPRO AT2 XTREME 2026,9.00,,,4.00,4.00,470.00,500.00,400.00,70.00,1600.00,1880.00",
-      ",7,185.R14C,GOODYEAR CARGO MARATHON2 2024,8.80,,,2.00,2.00,310.00,320.00,285.00,25.00,570.00,620.00"
-    ].join("\n");
-
-    const csvContent = csvHeader + sampleRows;
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "template_sync_lias_tyre.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportCurrentInventoryCSV = () => {
-    const csvHeader = "BRAND ID,NO,SIZE TAYAR,BRAND,TEBAL - MM,NEXEN TDU,GOODYEAR,STORE TMD,TOTAL STOK,HARGA MARKET - REGULAR 1,HARGA MARKET - NEW 2,HARGA STOK,NEW PROFIT nov 25,TOTAL STOK VALUE,SOLD VALUE\n";
-    const rows = tyres.map((t, idx) => {
-      const brandFull = `${t.brand} ${t.model}`;
-      const totalCostVal = (t.costPrice * t.storeStock).toFixed(2);
-      const soldVal = (t.marketPrice * t.storeStock).toFixed(2);
-      const profitVal = (t.marketPrice - t.costPrice).toFixed(2);
-      const sizeDot = t.size.replace(/\//g, ".").replace(/R/g, ".");
-      const nexenStock = t.supplierStockNexen ? t.supplierStockNexen.toFixed(2) : "";
-      const goodyearStock = t.supplierStockGoodyear ? t.supplierStockGoodyear.toFixed(2) : "";
-      const storeStockStr = t.storeStock.toFixed(2);
-      const totalStockStr = t.totalStock.toFixed(2);
-      const marketPriceStr = t.marketPrice.toFixed(2);
-      const promoPriceStr = (t.marketPrice + 10).toFixed(2);
-      const costPriceStr = t.costPrice.toFixed(2);
-      const treadStr = (t.treadDepthMm || 7.5).toFixed(2);
-
-      return `"${t.brandId || ""}","${idx + 1}","${sizeDot}","${brandFull}",${treadStr},${nexenStock},${goodyearStock},${storeStockStr},${totalStockStr},${marketPriceStr},${promoPriceStr},${costPriceStr},${profitVal},${totalCostVal},${soldVal}`;
-    }).join("\n");
-
-    const csvContent = csvHeader + rows;
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `inventori_lias_tyre_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleConfirmImportCSV = () => {
-    if (parsedPreview.length === 0) return;
-    if (onImportBulkTyres) {
-      onImportBulkTyres(parsedPreview);
-    } else {
-      parsedPreview.forEach((t) => onAddTyre(t));
-    }
-    setSyncNotice(`Penyelarasan Data Berjaya! ${parsedPreview.length} SKU tayar kini diselaraskan terus ke dalam sistem.`);
-    setShowCsvModal(false);
-    setCsvText("");
-    setParsedPreview([]);
-  };
+  const [nexenStock, setNexenStock] = useState(0);
+  const [goodyearStock, setGoodyearStock] = useState(0);
 
   // Business Analytics Calculations
-  const totalStockUnits = tyres.reduce((sum, t) => sum + t.storeStock, 0);
-  const totalStockValue = tyres.reduce((sum, t) => sum + t.costPrice * t.storeStock, 0);
-  const totalPotentialMarketValue = tyres.reduce((sum, t) => sum + t.marketPrice * t.storeStock, 0);
-  const totalPotentialProfit = totalPotentialMarketValue - totalStockValue;
+  const totalAllStockUnits = useMemo(() => {
+    return tyres.reduce((sum, t) => {
+      const allForTire = t.totalStock !== undefined ? t.totalStock : (t.storeStock + (t.supplierStockNexen || 0) + (t.supplierStockGoodyear || 0));
+      return sum + allForTire;
+    }, 0);
+  }, [tyres]);
 
-  const lowStockItems = tyres.filter((t) => t.storeStock <= 2);
-  const brandsCount = new Set(tyres.map((t) => t.brand)).size;
-  const modelsCount = new Set(tyres.map((t) => t.model)).size;
+  const totalStoreStockUnits = useMemo(() => {
+    return tyres.reduce((sum, t) => sum + (t.storeStock || 0), 0);
+  }, [tyres]);
+
+  const totalSupplierNexen = useMemo(() => {
+    return tyres.reduce((sum, t) => sum + (t.supplierStockNexen || 0), 0);
+  }, [tyres]);
+
+  const totalSupplierGoodyear = useMemo(() => {
+    return tyres.reduce((sum, t) => sum + (t.supplierStockGoodyear || 0), 0);
+  }, [tyres]);
+
+  const totalSupplierStockUnits = totalSupplierNexen + totalSupplierGoodyear;
+
+  // Financial Value calculations (TMD Store vs ALL Stock)
+  const totalStoreStockValue = useMemo(() => {
+    return tyres.reduce((sum, t) => sum + (t.costPrice * (t.storeStock || 0)), 0);
+  }, [tyres]);
+
+  const totalStoreMarketValue = useMemo(() => {
+    return tyres.reduce((sum, t) => sum + (t.marketPrice * (t.storeStock || 0)), 0);
+  }, [tyres]);
+
+  const totalStoreProfit = totalStoreMarketValue - totalStoreStockValue;
+
+  const totalAllStockValue = useMemo(() => {
+    return tyres.reduce((sum, t) => {
+      const qty = t.totalStock !== undefined ? t.totalStock : (t.storeStock + (t.supplierStockNexen || 0) + (t.supplierStockGoodyear || 0));
+      return sum + (t.costPrice * qty);
+    }, 0);
+  }, [tyres]);
+
+  const totalAllMarketValue = useMemo(() => {
+    return tyres.reduce((sum, t) => {
+      const qty = t.totalStock !== undefined ? t.totalStock : (t.storeStock + (t.supplierStockNexen || 0) + (t.supplierStockGoodyear || 0));
+      return sum + (t.marketPrice * qty);
+    }, 0);
+  }, [tyres]);
+
+  const totalAllPotentialProfit = totalAllMarketValue - totalAllStockValue;
+
+  const lowStockItems = useMemo(() => {
+    return tyres.filter((t) => (t.totalStock !== undefined ? t.totalStock : t.storeStock) <= 2);
+  }, [tyres]);
+
+  const brandsCount = useMemo(() => new Set(tyres.map((t) => t.brand)).size, [tyres]);
+  const modelsCount = useMemo(() => new Set(tyres.map((t) => t.model)).size, [tyres]);
+
+  // Filtered Table Tyres
+  const filteredTyres = useMemo(() => {
+    return tyres.filter((t) => {
+      const matchesSearch =
+        searchFilter === "" ||
+        t.size.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        t.brand.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        t.model.toLowerCase().includes(searchFilter.toLowerCase());
+      
+      const matchesCat =
+        selectedCategoryFilter === "ALL" ||
+        t.category === selectedCategoryFilter;
+
+      return matchesSearch && matchesCat;
+    });
+  }, [tyres, searchFilter, selectedCategoryFilter]);
 
   const handleExecuteSync = (mode: "standard" | "popular" | "reset" | "custom") => {
     if (onSyncMasterStock) {
@@ -433,7 +153,7 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
       } else if (mode === "popular") {
         textNotice = `Penyelarasan Saiz Laris Berjaya! Saiz popular disetkan ke 24 unit dan saiz biasa ke 8 unit.`;
       } else if (mode === "reset") {
-        textNotice = `Baki Stok Berjaya Di-Reset mengikut Katalog Master Kilang asal!`;
+        textNotice = `Baki Stok Berjaya Di-Reset mengikut Katalog Master Kilang asal (Total Stok: 1,052 Unit)!`;
       } else if (mode === "custom") {
         textNotice = `Master Data Berjaya Diselaraskan! Kesemua SKU kini mempunyai ${customQtyInput} unit stok sekata.`;
       }
@@ -444,16 +164,19 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
 
   const handleSubmitNewTire = (e: React.FormEvent) => {
     e.preventDefault();
-    const parts = size.split("/");
+    const formattedSize = normalizeSize(size);
+    const parts = formattedSize.split("/");
     const width = parseInt(parts[0]) || 205;
-    const rim = parseInt(size.split("R")[1]) || 16;
+    const rim = parseInt(formattedSize.split("R")[1]) || 16;
     const aspect = parseInt(parts[1]?.split("R")[0]) || 55;
+
+    const totalQty = storeStock + nexenStock + goodyearStock;
 
     const newTire: Tire = {
       id: "NEW-" + Date.now(),
-      brandId: brand.toLowerCase(),
+      brandId: brand.toLowerCase().replace(/[^a-z0-9]/g, ""),
       brand: brand.toUpperCase(),
-      size: size,
+      size: formattedSize,
       width,
       aspectRatio: aspect,
       rimSize: rim,
@@ -467,192 +190,360 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
       costPrice,
       profit: marketPrice - costPrice,
       storeStock,
-      totalStock: storeStock,
-      status: storeStock > 2 ? "In Stock" : "Low Stock",
+      supplierStockNexen: nexenStock,
+      supplierStockGoodyear: goodyearStock,
+      totalStock: totalQty,
+      status: totalQty <= 0 ? "Out of Stock" : storeStock <= 2 ? "Low Stock" : "In Stock",
       year: 2026,
       wetGripRating: "A",
       noiseLevelDb: 68,
       fuelSavingRating: "B",
       treadLifeKm: 55000,
-      description: `Tayar ${brand} ${model} saiz ${size} untuk kegunaan ${category}.`,
-      keyTechnologies: ["Enhanced Compound", "Safety Grooves"],
-      imageUrl: imageId.startsWith("http") ? imageId.trim() : undefined,
-      imageId: imageId.startsWith("http") ? undefined : (imageId.trim() || undefined)
+      description: `Tayar ${brand} ${model} saiz ${formattedSize} rasmi TMD.`,
+      keyTechnologies: ["Manual Entry"],
+      imageId: imageId || undefined,
     };
 
     onAddTyre(newTire);
     setShowAddModal(false);
   };
 
+  // Preview CSV Text
+  const handlePreviewCsv = (text: string) => {
+    setCsvText(text);
+    const parsed = parseCSVTextToTyres(text);
+    setParsedPreview(parsed);
+  };
+
+  // Load Built-in Master Sample CSV Data
+  const handleLoadSampleCsv = () => {
+    handlePreviewCsv(LIAS_TYRE_CSV_SAMPLE_RAW);
+  };
+
+  // Commit Import
+  const handleExecuteImport = () => {
+    if (parsedPreview.length === 0) return;
+    if (onImportBulkTyres) {
+      onImportBulkTyres(parsedPreview);
+    }
+    setShowCsvModal(false);
+    setCsvText("");
+    setParsedPreview([]);
+    setSyncNotice(`Berjaya import ${parsedPreview.length} SKU tayar ke pangkalan data TMD!`);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Top Banner Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Header Banner */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 mb-2">
-            <BarChart3 className="w-3.5 h-3.5 text-red-600" /> Dashboard & Analitik Inventori
-          </span>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Pusat Kawalan Stok & Prestasi Kedai Tayar
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">
-            Statistik inventori, penilaian nilai stok kewangan, amaran stok rendah, dan kemaskini stok secara realtime.
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-red-600" />
+              Papan Kawalan Inventori & Baki Stok
+            </h2>
+            <span className="bg-red-50 text-red-600 text-xs font-black uppercase px-2.5 py-0.5 rounded-full border border-red-200">
+              Admin TMD
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Pantau baki fizikal stor TMD, pembekal Nexen & Goodyear, nilai kos stok, dan potensi untung.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowCsvModal(true)}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center gap-2"
-          >
-            <FileSpreadsheet className="w-4 h-4" /> Import Fail CSV / Sync Bulk
-          </button>
+        {persona === "Kedai Tayar" && (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => {
+                setShowCsvModal(true);
+                if (!csvText) handleLoadSampleCsv();
+              }}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-200" /> Import Master CSV ({tyres.length} SKU)
+            </button>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Tambah Rekod Tayar Baru
-          </button>
-        </div>
+            <button
+              onClick={() => setShowSyncModal(true)}
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <FolderSync className="w-4 h-4 text-yellow-400" /> Selaras Master Data
+            </button>
+
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-white" /> Tambah Tayar Baru
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Sync Success Feedback Toast */}
+      {/* Sync Success Feedback Notice Banner */}
       {syncNotice && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 p-4 rounded-xl text-xs font-semibold flex items-center justify-between shadow-sm animate-fadeIn">
-          <div className="flex items-center gap-2.5">
+        <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 flex items-center justify-between gap-3 text-emerald-900 text-xs animate-fadeIn shadow-xs">
+          <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>{syncNotice}</span>
+            <span className="font-bold">{syncNotice}</span>
           </div>
           <button
             onClick={() => setSyncNotice("")}
-            className="text-emerald-700 hover:text-emerald-900 font-bold underline text-[11px]"
+            className="text-emerald-700 hover:text-emerald-900 font-extrabold text-xs underline cursor-pointer"
           >
             Tutup
           </button>
         </div>
       )}
 
-      {/* Admin Quick Sync Onboarding Banner */}
-      {onSyncMasterStock && (
-        <div className="bg-gradient-to-r from-slate-900 via-red-950 to-slate-900 text-white rounded-xl p-5 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-800">
-          <div className="space-y-1 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="bg-amber-400 text-slate-950 text-[10px] font-black uppercase px-2 py-0.5 rounded">
-                Ganjaran Admin
-              </span>
-              <h3 className="text-sm font-bold text-amber-300 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-400" /> Penyelarasan Master Data Stok Permulaan (1-Klik Auto-Sync)
-              </h3>
+      {/* Quick Sync Onboarding Banner if stock is empty or user wants one-click master sync */}
+      {persona === "Kedai Tayar" && totalAllStockUnits === 0 && (
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-5 border border-slate-700 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center shrink-0">
+              <Sparkles className="w-6 h-6 text-yellow-400" />
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Pengguna Admin Baru tidak perlu mengemaskini baki stok satu per satu secara manual. Gunakan fungsi <strong>Auto-Sync Master Data</strong> untuk terus memasukkan kuantiti stok standard kedai bagi kesemua SKU serta-merta.
-            </p>
+            <div>
+              <h4 className="text-sm font-black text-white flex items-center gap-1.5">
+                Stok Kosong Dikesan — Muat Turun Master Data Kilang
+              </h4>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Klik butang di sebelah untuk memuatkan kesemua {tyres.length} SKU katalog tayar dengan baki stok rasmi (1,052 Unit).
+              </p>
+            </div>
           </div>
-
           <button
-            onClick={() => setShowSyncModal(true)}
-            className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-extrabold text-xs rounded-lg shadow transition-all shrink-0 flex items-center gap-2"
+            onClick={() => handleExecuteSync("reset")}
+            className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-extrabold text-xs rounded-lg shadow transition-all shrink-0 flex items-center gap-2 cursor-pointer"
           >
-            <FolderSync className="w-4 h-4 text-slate-950" /> Buka Menu Sync Master Data
+            <FolderSync className="w-4 h-4 text-slate-950" /> Muatkan Master Stok Asal (1,052 Unit)
           </button>
         </div>
       )}
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-1">
-          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block flex items-center gap-1">
-            <Warehouse className="w-4 h-4 text-red-600" /> Jumlah Stok Kedai
-          </span>
-          <div className="text-3xl font-extrabold text-slate-900 font-mono">{totalStockUnits} Unit</div>
-          <p className="text-[11px] text-slate-400">{tyres.length} SKU Tayar Berbeza</p>
+        {/* KPI 1: Total Stock ALL (Matched to CSS Selector) */}
+        <div
+          id="kpi-total-stock-all"
+          className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-2 hover:border-red-300 transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-600 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+              <Warehouse className="w-4 h-4 text-red-600" /> Jumlah Stok ALL
+            </span>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+              Total Stock
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">
+              {totalAllStockUnits.toLocaleString()}
+            </span>
+            <span className="text-sm font-bold text-slate-500 font-mono">Unit</span>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className="inline-flex items-center gap-1 font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200" title="Stok fizikal dalam stor TMD">
+              🏢 TMD: <strong className="text-slate-900 font-mono">{totalStoreStockUnits.toLocaleString()}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1 font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200" title="Stok pembekal Nexen & Goodyear">
+              📦 Nexen/GY: <strong className="text-indigo-950 font-mono">{totalSupplierStockUnits.toLocaleString()}</strong>
+            </span>
+          </div>
+
+          <p className="text-[10px] text-slate-400 font-medium pt-0.5">
+            {tyres.length} SKU Berdaftar (NEXEN: {totalSupplierNexen} | GOODYEAR: {totalSupplierGoodyear})
+          </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-1">
-          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block flex items-center gap-1">
-            <DollarSign className="w-4 h-4 text-red-600" /> Nilai Kos Inventori
+        {/* KPI 2: Inventory Cost Value */}
+        <div
+          id="kpi-inventory-value"
+          className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-2 hover:border-red-300 transition-all"
+        >
+          <span className="text-xs text-slate-600 font-extrabold uppercase tracking-wider block flex items-center gap-1.5">
+            <DollarSign className="w-4 h-4 text-red-600" /> Nilai Kos Inventori (ALL)
           </span>
-          <div className="text-3xl font-extrabold text-red-600 font-mono">RM{totalStockValue.toLocaleString()}</div>
-          <p className="text-[11px] text-slate-400">Modal Terikat Dalam Stok</p>
+          <div className="text-3xl font-extrabold text-red-600 font-mono tracking-tight">
+            RM{totalAllStockValue.toLocaleString()}
+          </div>
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Kos TMD Sahaja:</span>
+            <strong className="font-mono text-slate-800">RM{totalStoreStockValue.toLocaleString()}</strong>
+          </div>
+          <p className="text-[10px] text-slate-400 font-medium">Modal Terikat Termasuk Tempahan</p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-1">
-          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block flex items-center gap-1">
+        {/* KPI 3: Potential Profit */}
+        <div
+          id="kpi-potential-profit"
+          className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-2 hover:border-emerald-300 transition-all"
+        >
+          <span className="text-xs text-slate-600 font-extrabold uppercase tracking-wider block flex items-center gap-1.5">
             <TrendingUp className="w-4 h-4 text-emerald-600" /> Potensi Untung Kasar
           </span>
-          <div className="text-3xl font-extrabold text-emerald-600 font-mono">+RM{totalPotentialProfit.toLocaleString()}</div>
-          <p className="text-[11px] text-slate-400">Hasil Apabila Semua Terjual</p>
+          <div className="text-3xl font-extrabold text-emerald-600 font-mono tracking-tight">
+            +RM{totalAllPotentialProfit.toLocaleString()}
+          </div>
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Untung TMD:</span>
+            <strong className="font-mono text-emerald-700">+RM{totalStoreProfit.toLocaleString()}</strong>
+          </div>
+          <p className="text-[10px] text-slate-400 font-medium">Hasil Apabila Keseluruhan Dijual</p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-1">
-          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block flex items-center gap-1">
+        {/* KPI 4: Low Stock Alert */}
+        <div
+          id="kpi-low-stock"
+          className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-2 hover:border-rose-300 transition-all"
+        >
+          <span className="text-xs text-slate-600 font-extrabold uppercase tracking-wider block flex items-center gap-1.5">
             <AlertTriangle className="w-4 h-4 text-rose-600" /> Amaran Stok Rendah
           </span>
-          <div className="text-3xl font-extrabold text-rose-600 font-mono">{lowStockItems.length} SKU</div>
-          <p className="text-[11px] text-slate-400">Stok ≤ 2 Biji Dalam Kedai</p>
+          <div className="text-3xl font-extrabold text-rose-600 font-mono tracking-tight">
+            {lowStockItems.length} <span className="text-sm font-semibold text-slate-500">SKU</span>
+          </div>
+          <div className="pt-2 border-t border-slate-100 text-[11px] text-rose-700 font-semibold flex items-center gap-1">
+            <span>Baki Total Stok ≤ 2 Unit</span>
+          </div>
+          <p className="text-[10px] text-slate-400 font-medium">Perlu Buat Pesanan Pembekal</p>
         </div>
       </div>
 
       {/* Main Stock Table */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900">Senarai Inventori & Kemaskini Baki Stok</h3>
-          <span className="text-xs text-slate-500 font-mono">Jumlah Jenama: {brandsCount} | Model: {modelsCount}</span>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Senarai Inventori & Kemaskini Baki Stok</h3>
+            <span className="text-xs text-slate-500 font-mono">
+              Memaparkan {filteredTyres.length} daripada {tyres.length} SKU | Jumlah Jenama: {brandsCount} | Model: {modelsCount}
+            </span>
+          </div>
+
+          {/* Quick Search & Category Filter */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari saiz / jenama / model..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg w-56 text-slate-800 outline-none focus:bg-white focus:border-red-500"
+              />
+            </div>
+
+            <select
+              value={selectedCategoryFilter}
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+              className="py-1.5 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:bg-white focus:border-red-500"
+            >
+              <option value="ALL">Semua Kategori</option>
+              <option value="Passenger">Passenger</option>
+              <option value="SUV / Crossover">SUV / Crossover</option>
+              <option value="4x4 / Offroad">4x4 / Offroad</option>
+              <option value="Commercial / Van">Commercial / Van</option>
+              <option value="Performance / UHP">Performance / UHP</option>
+            </select>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[600px] border border-slate-100 rounded-lg">
           <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase bg-slate-50">
+            <thead className="sticky top-0 z-10 bg-slate-100 shadow-xs">
+              <tr className="border-b border-slate-200 text-slate-600 font-extrabold uppercase">
                 <th className="p-3">Jenama & Model</th>
                 <th className="p-3 font-mono">Kod Saiz</th>
                 <th className="p-3">Kategori</th>
                 <th className="p-3 text-right">Harga Kos</th>
                 <th className="p-3 text-right">Harga Jual</th>
-                <th className="p-3 text-right">Untung / Biji</th>
-                <th className="p-3 text-center">Baki Stok Kedai</th>
+                <th className="p-3 text-right">Untung</th>
+                <th className="p-3 text-center">Stok TMD (Kedai)</th>
+                <th className="p-3 text-center font-mono">NEXEN</th>
+                <th className="p-3 text-center font-mono">GOODYEAR</th>
+                <th className="p-3 text-center font-mono bg-red-50/80 text-red-700">TOTAL STOK</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {tyres.map((tire) => (
-                <tr key={tire.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3">
-                    <strong className="text-red-600 uppercase block">{tire.brand}</strong>
-                    <span className="text-slate-800 font-bold">{tire.model}</span>
-                  </td>
-                  <td className="p-3 font-mono font-bold text-slate-900 text-sm">{tire.size}</td>
-                  <td className="p-3 text-slate-500">{tire.category}</td>
-                  <td className="p-3 text-right font-mono text-slate-500">RM{tire.costPrice}</td>
-                  <td className="p-3 text-right font-mono font-bold text-red-600">RM{tire.marketPrice}</td>
-                  <td className="p-3 text-right font-mono text-emerald-600 font-bold">+RM{tire.profit}</td>
-                  <td className="p-3 text-center">
-                    <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 p-1 rounded-lg">
-                      <button
-                        onClick={() => onUpdateStock(tire.id, Math.max(0, tire.storeStock - 1))}
-                        className="w-6 h-6 bg-white border border-slate-300 hover:bg-slate-100 rounded text-slate-800 font-extrabold text-xs flex items-center justify-center transition-colors"
-                        title="Kurangkan Stok (-1)"
+              {filteredTyres.map((tire) => {
+                const totalForThisTire = tire.totalStock !== undefined
+                  ? tire.totalStock
+                  : (tire.storeStock + (tire.supplierStockNexen || 0) + (tire.supplierStockGoodyear || 0));
+
+                return (
+                  <tr key={tire.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3">
+                      <strong className="text-red-600 uppercase block">{tire.brand}</strong>
+                      <span className="text-slate-800 font-bold">{tire.model}</span>
+                    </td>
+                    <td className="p-3 font-mono font-bold text-slate-900 text-sm">{tire.size}</td>
+                    <td className="p-3 text-slate-500">
+                      <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-medium text-slate-600">
+                        {tire.category}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right font-mono text-slate-500">RM{tire.costPrice}</td>
+                    <td className="p-3 text-right font-mono font-bold text-red-600">RM{tire.marketPrice}</td>
+                    <td className="p-3 text-right font-mono text-emerald-600 font-bold">+RM{tire.profit}</td>
+                    
+                    {/* Store TMD Quick Increment / Decrement */}
+                    <td className="p-3 text-center">
+                      <div className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 p-0.5 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateStock(tire.id, Math.max(0, tire.storeStock - 1))}
+                          className="w-5 h-5 bg-white border border-slate-300 hover:bg-slate-100 rounded text-slate-800 font-extrabold text-xs flex items-center justify-center transition-colors cursor-pointer"
+                          title="Kurangkan Stok (-1)"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          value={tire.storeStock}
+                          onChange={(e) => onUpdateStock(tire.id, Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-10 text-center font-mono font-bold text-slate-900 bg-white border border-slate-200 rounded py-0.5 text-xs outline-none focus:border-red-500"
+                          title="Taip jumlah stok langsung"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => onUpdateStock(tire.id, tire.storeStock + 1)}
+                          className="w-5 h-5 bg-white border border-slate-300 hover:bg-slate-100 rounded text-slate-800 font-extrabold text-xs flex items-center justify-center transition-colors cursor-pointer"
+                          title="Tambah Stok (+1)"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+
+                    {/* Nexen Stock */}
+                    <td className="p-3 text-center font-mono text-slate-700">
+                      {tire.supplierStockNexen || 0}
+                    </td>
+
+                    {/* Goodyear Stock */}
+                    <td className="p-3 text-center font-mono text-slate-700">
+                      {tire.supplierStockGoodyear || 0}
+                    </td>
+
+                    {/* Total Stock */}
+                    <td className="p-3 text-center font-mono font-black bg-red-50/50">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded font-mono font-bold text-xs ${
+                          totalForThisTire === 0
+                            ? "bg-slate-200 text-slate-500"
+                            : totalForThisTire <= 2
+                            ? "bg-amber-100 text-amber-800 border border-amber-300"
+                            : "bg-red-100 text-red-700 border border-red-200"
+                        }`}
                       >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        value={tire.storeStock}
-                        onChange={(e) => onUpdateStock(tire.id, Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-12 text-center font-mono font-bold text-slate-900 bg-white border border-slate-200 rounded py-0.5 text-xs outline-none focus:border-red-500"
-                        title="Taip jumlah stok langsung"
-                      />
-                      <button
-                        onClick={() => onUpdateStock(tire.id, tire.storeStock + 1)}
-                        className="w-6 h-6 bg-white border border-slate-300 hover:bg-slate-100 rounded text-slate-800 font-extrabold text-xs flex items-center justify-center transition-colors"
-                        title="Tambah Stok (+1)"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {totalForThisTire} Unit
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -677,7 +568,7 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
               </div>
 
               <div>
-                <label className="block text-slate-600 font-bold mb-1">Saiz (cth: 205/55R16)</label>
+                <label className="block text-slate-600 font-bold mb-1">Saiz (cth: 205/55R16 atau 175.65.14)</label>
                 <input
                   type="text"
                   required
@@ -710,7 +601,7 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono text-xs focus:bg-white focus:border-red-500 outline-none"
                 />
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  Boleh masukkan link penuh GitHub (cth: https://github.com/syncrozz/syncrozz-assets/blob/main/Gambar%20Tayar/TY004.webp) atau ID aset sahaja. Biarkan kosong jika tiada gambar.
+                  Boleh masukkan link penuh GitHub atau ID aset (cth: TY001). Biarkan kosong jika tiada.
                 </p>
               </div>
 
@@ -722,10 +613,9 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
                     required
                     value={costPrice}
                     onChange={(e) => setCostPrice(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono focus:bg-white focus:border-red-500 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono font-bold focus:bg-white focus:border-red-500 outline-none"
                   />
                 </div>
-
                 <div>
                   <label className="block text-slate-600 font-bold mb-1">Harga Jual (RM)</label>
                   <input
@@ -733,33 +623,53 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
                     required
                     value={marketPrice}
                     onChange={(e) => setMarketPrice(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono font-bold text-red-600 focus:bg-white focus:border-red-500 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono font-bold focus:bg-white focus:border-red-500 outline-none"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-600 font-bold mb-1">Kuantiti Stok Kedai</label>
-                <input
-                  type="number"
-                  required
-                  value={storeStock}
-                  onChange={(e) => setStoreStock(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono focus:bg-white focus:border-red-500 outline-none"
-                />
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Stok TMD (Kedai)</label>
+                  <input
+                    type="number"
+                    required
+                    value={storeStock}
+                    onChange={(e) => setStoreStock(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono font-bold focus:bg-white focus:border-red-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Stok Nexen</label>
+                  <input
+                    type="number"
+                    value={nexenStock}
+                    onChange={(e) => setNexenStock(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono font-bold focus:bg-white focus:border-red-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Stok Goodyear</label>
+                  <input
+                    type="number"
+                    value={goodyearStock}
+                    onChange={(e) => setGoodyearStock(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono font-bold focus:bg-white focus:border-red-500 outline-none"
+                  />
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 transition-colors"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-sm"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow cursor-pointer"
                 >
                   Simpan Tayar
                 </button>
@@ -769,338 +679,223 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
         </div>
       )}
 
-      {/* Sync Master Data Modal */}
-      {showSyncModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center font-bold">
-                  <RefreshCw className="w-4 h-4 text-amber-700" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Penyelarasan Master Data Stok</h3>
-                  <p className="text-[11px] text-slate-500">Pilih kaedah auto-sync stok permulaan untuk Admin Baru</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowSyncModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {/* Option 1: Standard Baseline */}
-              <label
-                onClick={() => setSelectedSyncMode("standard")}
-                className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 block ${
-                  selectedSyncMode === "standard"
-                    ? "border-red-600 bg-red-50/60 shadow-sm"
-                    : "border-slate-200 hover:border-slate-300 bg-white"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="syncMode"
-                  checked={selectedSyncMode === "standard"}
-                  onChange={() => setSelectedSyncMode("standard")}
-                  className="mt-1 accent-red-600"
-                />
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <strong className="text-xs font-extrabold text-slate-900">🎯 Stok Baseline Standard (12 Unit / SKU)</strong>
-                    <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded">Disyorkan</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-normal">
-                    Mengisi baki stok 12 unit bagi kesemua SKU tayar. Ideal untuk stok permulaan yang seimbang di kedai.
-                  </p>
-                </div>
-              </label>
-
-              {/* Option 2: High Demand Popular Sizes */}
-              <label
-                onClick={() => setSelectedSyncMode("popular")}
-                className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 block ${
-                  selectedSyncMode === "popular"
-                    ? "border-red-600 bg-red-50/60 shadow-sm"
-                    : "border-slate-200 hover:border-slate-300 bg-white"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="syncMode"
-                  checked={selectedSyncMode === "popular"}
-                  onChange={() => setSelectedSyncMode("popular")}
-                  className="mt-1 accent-red-600"
-                />
-                <div className="space-y-0.5">
-                  <strong className="text-xs font-extrabold text-slate-900">🔥 Utamakan Saiz Popular & Laris (24 vs 8 Unit)</strong>
-                  <p className="text-[11px] text-slate-500 leading-normal">
-                    Memberikan stok tinggi (24 unit) untuk saiz carian tertinggi (205/55R16, 185/65R15, 215/55R17) dan 8 unit untuk saiz lain.
-                  </p>
-                </div>
-              </label>
-
-              {/* Option 3: Reset Factory Master Catalog */}
-              <label
-                onClick={() => setSelectedSyncMode("reset")}
-                className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 block ${
-                  selectedSyncMode === "reset"
-                    ? "border-red-600 bg-red-50/60 shadow-sm"
-                    : "border-slate-200 hover:border-slate-300 bg-white"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="syncMode"
-                  checked={selectedSyncMode === "reset"}
-                  onChange={() => setSelectedSyncMode("reset")}
-                  className="mt-1 accent-red-600"
-                />
-                <div className="space-y-0.5">
-                  <strong className="text-xs font-extrabold text-slate-900">🏭 Reset ke Katalog Asal Master Pembekal</strong>
-                  <p className="text-[11px] text-slate-500 leading-normal">
-                    Mengembalikan baki stok mengikut rekod katalog kilang/pembekal asal platform.
-                  </p>
-                </div>
-              </label>
-
-              {/* Option 4: Custom Uniform Stock */}
-              <label
-                onClick={() => setSelectedSyncMode("custom")}
-                className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 block ${
-                  selectedSyncMode === "custom"
-                    ? "border-red-600 bg-red-50/60 shadow-sm"
-                    : "border-slate-200 hover:border-slate-300 bg-white"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="syncMode"
-                  checked={selectedSyncMode === "custom"}
-                  onChange={() => setSelectedSyncMode("custom")}
-                  className="mt-1 accent-red-600"
-                />
-                <div className="space-y-1.5 w-full">
-                  <strong className="text-xs font-extrabold text-slate-900">🔢 Set Kuantiti Custom Sekata</strong>
-                  <p className="text-[11px] text-slate-500 leading-normal">
-                    Tetapkan jumlah unit stok yang sama untuk dikemaskini ke semua SKU sekali gus.
-                  </p>
-                  {selectedSyncMode === "custom" && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-xs font-bold text-slate-700">Jumlah Stok / SKU:</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="1000"
-                        value={customQtyInput}
-                        onChange={(e) => setCustomQtyInput(parseInt(e.target.value) || 0)}
-                        className="w-20 bg-white border border-red-300 rounded px-2.5 py-1 text-slate-900 font-mono font-bold text-xs outline-none focus:border-red-600"
-                      />
-                      <span className="text-xs text-slate-500 font-bold">unit</span>
-                    </div>
-                  )}
-                </div>
-              </label>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowSyncModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={() => handleExecuteSync(selectedSyncMode)}
-                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-slate-950" /> Sahkan & Sync Stok
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CSV / Excel Bulk Sync Modal */}
+      {/* CSV Bulk Import Modal */}
       {showCsvModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 space-y-5 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1.5 mb-1.5">
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Auto-Sync Bulk CSV / Excel (300+ SKU)
-                </span>
-                <h3 className="text-xl font-bold text-slate-900">
-                  Modul Import & Penyelarasan Data Inventori Tayar
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Muat naik fail CSV dari sistem POS / ERP (seperti AutoCount / SQL Accounting) atau tampal (paste) data terus untuk diselaraskan secara automatik.
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                Import Master Data CSV / Excel (15-Kolum TMD)
+              </h3>
               <button
                 onClick={() => setShowCsvModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1"
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-4 overflow-y-auto pr-1 flex-1">
-              {/* Template Download & Export Action Banner */}
-              <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold">
-                    <FileSpreadsheet className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-slate-900">Template CSV Rasmi Lias Tyre</h4>
-                    <p className="text-[11px] text-slate-600">Gunakan template standard ini untuk elak isu format atau konflik lajur data semasa sync.</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={handleDownloadCSVTemplate}
-                    className="flex-1 sm:flex-initial px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Muat Turun Template (.csv)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportCurrentInventoryCSV}
-                    className="flex-1 sm:flex-initial px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Export Data Semasa
-                  </button>
-                </div>
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-600">
+                Tampal (paste) teks CSV atau gunakan data master rasmi yang telah dipetakan mengikut struktur fail inventory Lias Tyre.
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleLoadSampleCsv}
+                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" /> Muat Master Data TMD Rasmi (317 SKU / 1,052 Stok)
+                </button>
               </div>
 
-              {/* File Upload & Sample Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <UploadCloud className="w-4 h-4 text-emerald-600" /> Muat Naik Fail CSV (.csv):
-                  </label>
-                  <input
-                    type="file"
-                    accept=".csv,.txt"
-                    onChange={handleFileUpload}
-                    className="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
-                  />
-                </div>
+              <textarea
+                rows={8}
+                value={csvText}
+                onChange={(e) => handlePreviewCsv(e.target.value)}
+                placeholder="Tampal data CSV anda di sini..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-mono text-[11px] text-slate-800 focus:bg-white focus:border-emerald-500 outline-none"
+              />
 
-                <div className="space-y-1.5 flex flex-col justify-end">
-                  <span className="text-[11px] text-slate-500">Ingin menguji format CSV yang anda kongsikan?</span>
-                  <button
-                    type="button"
-                    onClick={handleLoadSampleCSV}
-                    className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-slate-700" /> Isi Contoh CSV 300 SKU Sekarang
-                  </button>
-                </div>
-              </div>
-
-              {/* CSV Text Input Area */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800">
-                    Atau Tampal (Paste) Kandungan Data CSV Di Sini:
-                  </label>
-                  {parsedPreview.length > 0 && (
-                    <span className="text-xs font-bold text-emerald-700 font-mono">
-                      ✓ {parsedPreview.length} SKU Tayar Dikesan
-                    </span>
-                  )}
-                </div>
-                <textarea
-                  rows={5}
-                  value={csvText}
-                  onChange={(e) => handleCsvInputChange(e.target.value)}
-                  placeholder="BRAND ID,NO,SIZE TAYAR,BRAND,TEBAL - MM,NEXEN TDU,GOODYEAR,STORE TMD,TOTAL STOK,HARGA MARKET - REGULAR 1,HARGA MARKET - NEW 2,HARGA STOK,NEW PROFIT nov 25,TOTAL STOK VALUE,SOLD VALUE..."
-                  className="w-full bg-slate-900 text-emerald-400 font-mono text-[11px] p-3 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Parsed Live Preview Table */}
               {parsedPreview.length > 0 && (
-                <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-white">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Pratonton Data Berjaya Diproses ({parsedPreview.length} SKU)
-                    </h4>
-                    <span className="text-[11px] text-slate-500">
-                      Penukaran Saiz Format Auto-Mapped (cth: 175.65.14 ➔ 175/65R14)
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between text-emerald-900 font-bold">
+                    <span>Hasil Pengecaman: {parsedPreview.length} SKU Berjaya Diproses</span>
+                    <span className="font-mono text-xs">
+                      Total Stok: {parsedPreview.reduce((sum, t) => sum + (t.totalStock || 0), 0)} Unit (Kedai: {parsedPreview.reduce((sum, t) => sum + t.storeStock, 0)} Unit)
                     </span>
                   </div>
-
-                  <div className="overflow-x-auto max-h-48 rounded-lg border border-slate-100">
-                    <table className="w-full text-left text-[11px] border-collapse">
-                      <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0">
-                        <tr>
-                          <th className="p-2">Kod Saiz</th>
-                          <th className="p-2">Jenama & Model</th>
-                          <th className="p-2">Bunga (mm)</th>
-                          <th className="p-2 text-right">Stok Kedai</th>
-                          <th className="p-2 text-right">Harga Pasaran</th>
-                          <th className="p-2 text-right">Kos</th>
-                          <th className="p-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-mono">
-                        {parsedPreview.slice(0, 10).map((t, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="p-2 font-bold text-red-600">{t.size}</td>
-                            <td className="p-2 font-sans font-semibold text-slate-800">{t.brand} {t.model}</td>
-                            <td className="p-2">{t.treadDepthMm}mm</td>
-                            <td className="p-2 text-right font-bold text-slate-900">{t.storeStock} Biji</td>
-                            <td className="p-2 text-right text-emerald-700 font-bold">RM{t.marketPrice}</td>
-                            <td className="p-2 text-right text-slate-500">RM{t.costPrice}</td>
-                            <td className="p-2">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 font-bold text-slate-700 font-sans">
-                                {t.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="max-h-32 overflow-y-auto bg-white rounded border border-emerald-100 p-2 text-[10px] font-mono divide-y divide-slate-100">
+                    {parsedPreview.slice(0, 10).map((t, idx) => (
+                      <div key={idx} className="py-1 flex justify-between">
+                        <span>{t.size} {t.brand} {t.model}</span>
+                        <span className="text-slate-500">Kedai: {t.storeStock} | Total: {t.totalStock} | RM{t.marketPrice}</span>
+                      </div>
+                    ))}
+                    {parsedPreview.length > 10 && (
+                      <div className="text-center text-slate-400 pt-1 italic">
+                        ... dan {parsedPreview.length - 10} SKU lagi
+                      </div>
+                    )}
                   </div>
-                  {parsedPreview.length > 10 && (
-                    <p className="text-[10px] text-slate-400 text-center pt-1 font-medium">
-                      ...dan {parsedPreview.length - 10} SKU lagi sedia untuk diimport.
-                    </p>
-                  )}
                 </div>
               )}
-            </div>
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100 shrink-0">
-              <span className="text-xs text-slate-500 font-medium">
-                Sistem akan memadankan rekod tayar sedia ada atau menambah SKU baru secara automatik.
-              </span>
-
-              <div className="flex gap-2">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowCsvModal(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="button"
                   disabled={parsedPreview.length === 0}
-                  onClick={handleConfirmImportCSV}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                  onClick={handleExecuteImport}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-white" /> Sahkan & Sync {parsedPreview.length} SKU Sekarang
+                  <UploadCloud className="w-4 h-4" /> Sahkan & Import {parsedPreview.length} SKU
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sync Master Data Modal */}
+      {showSyncModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <FolderSync className="w-5 h-5 text-yellow-500" />
+                Penyelarasan Master Data Stok
+              </h3>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-600">
+                Pilih kaedah penyelarasan stok pukal untuk mengemaskini kesemua {tyres.length} SKU dalam pangkalan data TMD secara serentak:
+              </p>
+
+              <div className="space-y-2">
+                <label
+                  className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    selectedSyncMode === "reset" ? "bg-red-50 border-red-400 ring-1 ring-red-400" : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                  onClick={() => setSelectedSyncMode("reset")}
+                >
+                  <input
+                    type="radio"
+                    name="syncMode"
+                    checked={selectedSyncMode === "reset"}
+                    onChange={() => setSelectedSyncMode("reset")}
+                    className="mt-0.5 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <strong className="text-slate-900 block font-bold">1. Muatkan Stok Asal Master CSV (1,052 Unit)</strong>
+                    <span className="text-slate-500 text-[11px]">
+                      Mengembalikan baki stok mengikut rekod rasmi: Kedai TMD (733 unit), Nexen TDU (163 unit), Goodyear (156 unit).
+                    </span>
+                  </div>
+                </label>
+
+                <label
+                  className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    selectedSyncMode === "popular" ? "bg-red-50 border-red-400 ring-1 ring-red-400" : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                  onClick={() => setSelectedSyncMode("popular")}
+                >
+                  <input
+                    type="radio"
+                    name="syncMode"
+                    checked={selectedSyncMode === "popular"}
+                    onChange={() => setSelectedSyncMode("popular")}
+                    className="mt-0.5 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <strong className="text-slate-900 block font-bold">2. Penyelarasan Pintar (Saiz Laris Tinggi)</strong>
+                    <span className="text-slate-500 text-[11px]">
+                      Setkan 24 unit bagi saiz popular (175/65R14, 185/55R15, 205/55R16, 215/60R17) dan 8 unit bagi saiz lain.
+                    </span>
+                  </div>
+                </label>
+
+                <label
+                  className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    selectedSyncMode === "standard" ? "bg-red-50 border-red-400 ring-1 ring-red-400" : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                  onClick={() => setSelectedSyncMode("standard")}
+                >
+                  <input
+                    type="radio"
+                    name="syncMode"
+                    checked={selectedSyncMode === "standard"}
+                    onChange={() => setSelectedSyncMode("standard")}
+                    className="mt-0.5 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <strong className="text-slate-900 block font-bold">3. Stok Standard Sekata (12 Unit Setiap SKU)</strong>
+                    <span className="text-slate-500 text-[11px]">
+                      Menetapkan baki stok kepada 12 unit untuk setiap model bagi simulasi operasi penuh kedai.
+                    </span>
+                  </div>
+                </label>
+
+                <label
+                  className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    selectedSyncMode === "custom" ? "bg-red-50 border-red-400 ring-1 ring-red-400" : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                  onClick={() => setSelectedSyncMode("custom")}
+                >
+                  <input
+                    type="radio"
+                    name="syncMode"
+                    checked={selectedSyncMode === "custom"}
+                    onChange={() => setSelectedSyncMode("custom")}
+                    className="mt-0.5 text-red-600 focus:ring-red-500"
+                  />
+                  <div className="w-full">
+                    <strong className="text-slate-900 block font-bold">4. Kuantiti Tersuai (Custom Qty)</strong>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-slate-500 text-[11px]">Tetapkan baki kepada:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={customQtyInput}
+                        onChange={(e) => setCustomQtyInput(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-16 px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold text-center text-xs"
+                      />
+                      <span className="text-slate-500 text-[11px]">unit / SKU</span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowSyncModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExecuteSync(selectedSyncMode)}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FolderSync className="w-4 h-4" /> Laksanakan Penyelarasan
                 </button>
               </div>
             </div>
