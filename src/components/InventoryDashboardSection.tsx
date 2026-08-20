@@ -686,7 +686,7 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                Import Master Data CSV / Excel (15-Kolum TMD)
+                Import Master Data CSV / Excel (14-Header Column TMD)
               </h3>
               <button
                 onClick={() => setShowCsvModal(false)}
@@ -698,8 +698,11 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
 
             <div className="space-y-3 text-xs">
               <p className="text-slate-600">
-                Tampal (paste) teks CSV atau gunakan data master rasmi yang telah dipetakan mengikut struktur fail inventory Lias Tyre.
+                Sistem menyelaraskan (sync) data secara automatik berdasarkan elemen Header fail CSV anda:
               </p>
+              <div className="bg-slate-100 rounded-lg p-2 font-mono text-[10px] text-slate-700 overflow-x-auto whitespace-nowrap">
+                Bil, SIZE TAYAR, BRAND, MADE IN, NEXEN TDU, GOODYEAR, STORE TMD, TOTAL STOK, HARGA MARKET FOR MEMBERS, HARGA MARKET (NEW CUSTOMER), HARGA SUPPLIER , PROFIT, TOTAL STOK VALUE, TOTAL IF SOLD
+              </div>
 
               <div className="flex items-center gap-2">
                 <button
@@ -707,7 +710,7 @@ export const InventoryDashboardSection: React.FC<InventoryDashboardSectionProps>
                   onClick={handleLoadSampleCsv}
                   className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
                 >
-                  <FileText className="w-4 h-4" /> Muat Master Data TMD Rasmi (317 SKU / 1,052 Stok)
+                  <FileText className="w-4 h-4" /> Muat Master Data TMD Rasmi (14 Header Columns)
                 </button>
               </div>
 

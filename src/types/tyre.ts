@@ -38,6 +38,10 @@ export interface Tire {
   keyTechnologies: string[];
   madeIn?: string; // e.g. "CHINA", "MALAYSIA", "THAILAND", "JAPAN", "KOREA"
   countryOfOrigin?: string;
+  memberPrice?: number; // HARGA MARKET FOR MEMBERS
+  newCustomerPrice?: number; // HARGA MARKET (NEW CUSTOMER)
+  totalStockValue?: number; // TOTAL STOK VALUE
+  totalIfSold?: number; // TOTAL IF SOLD
   imageId?: string; // e.g. "TY001", "TY002" from github syncrozz-assets
   imageUrl?: string; // e.g. direct link or github link
   isNewProduct?: boolean;

@@ -88,7 +88,109 @@ export const parseCsvRow = (line: string): string[] => {
   return result;
 };
 
-// Parse CSV text to Tire array matching latest 15-column format
+// Helper to clean and parse float value
+const parseCleanNum = (val: string | undefined, defaultVal = 0): number => {
+  if (!val) return defaultVal;
+  const cleaned = val.replace(/,/g, "").replace(/"/g, "").trim();
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? defaultVal : num;
+};
+
+interface ColumnMap {
+  bil: number;
+  size: number;
+  brand: number;
+  madeIn: number;
+  nexen: number;
+  goodyear: number;
+  storeTmd: number;
+  totalStock: number;
+  memberPrice: number;
+  newCustomerPrice: number;
+  supplierCost: number;
+  profit: number;
+  totalStockValue: number;
+  totalIfSold: number;
+  treadDepth: number;
+}
+
+// Dynamically analyze CSV Header row to extract column indexes
+export const detectColumnMapping = (headers: string[]): ColumnMap => {
+  const map: ColumnMap = {
+    bil: -1,
+    size: -1,
+    brand: -1,
+    madeIn: -1,
+    nexen: -1,
+    goodyear: -1,
+    storeTmd: -1,
+    totalStock: -1,
+    memberPrice: -1,
+    newCustomerPrice: -1,
+    supplierCost: -1,
+    profit: -1,
+    totalStockValue: -1,
+    totalIfSold: -1,
+    treadDepth: -1,
+  };
+
+  headers.forEach((rawH, idx) => {
+    const h = rawH.toUpperCase().trim();
+    if (!h) return;
+
+    if (h === "BIL" || h === "NO" || h === "NO." || h === "ID") {
+      if (map.bil === -1) map.bil = idx;
+    } else if (h.includes("SIZE") || h.includes("SAIZ")) {
+      if (map.size === -1) map.size = idx;
+    } else if (h === "MADE IN" || h === "MADE" || h === "ORIGIN" || h.includes("BUATAN") || h === "NEGARA") {
+      if (map.madeIn === -1) map.madeIn = idx;
+    } else if (h.includes("NEXEN")) {
+      if (map.nexen === -1) map.nexen = idx;
+    } else if (h.includes("GOODYEAR")) {
+      if (map.goodyear === -1) map.goodyear = idx;
+    } else if (h.includes("STORE") || h.includes("TMD") || h.includes("KEDAI")) {
+      if (map.storeTmd === -1) map.storeTmd = idx;
+    } else if (h.includes("TOTAL STOK") || h.includes("TOTAL STOCK") || h.includes("JUMLAH STOK")) {
+      if (map.totalStock === -1) map.totalStock = idx;
+    } else if (h.includes("MEMBER") || h.includes("AHLI") || h.includes("REGULAR 1")) {
+      if (map.memberPrice === -1) map.memberPrice = idx;
+    } else if (h.includes("NEW CUSTOMER") || h.includes("NEW 2") || (h.includes("HARGA MARKET") && !h.includes("MEMBER"))) {
+      if (map.newCustomerPrice === -1) map.newCustomerPrice = idx;
+    } else if (h.includes("SUPPLIER") || h.includes("HARGA STOK") || h.includes("HARGA KOS") || h === "KOS" || h === "COST") {
+      if (map.supplierCost === -1) map.supplierCost = idx;
+    } else if (h.includes("PROFIT") || h.includes("UNTUNG")) {
+      if (map.profit === -1) map.profit = idx;
+    } else if (h.includes("TOTAL STOK VALUE") || h.includes("STOK VALUE") || h.includes("STOCK VALUE")) {
+      if (map.totalStockValue === -1) map.totalStockValue = idx;
+    } else if (h.includes("IF SOLD") || h.includes("SOLD VALUE") || h.includes("JUALAN")) {
+      if (map.totalIfSold === -1) map.totalIfSold = idx;
+    } else if (h.includes("TEBAL") || h.includes("TREAD") || h.includes("MM")) {
+      if (map.treadDepth === -1) map.treadDepth = idx;
+    } else if (h === "BRAND" || h.includes("JENAMA") || h.includes("MODEL") || h.includes("PATTERN")) {
+      if (map.brand === -1) map.brand = idx;
+    }
+  });
+
+  // Default fallbacks for the 14-column official template if some headers weren't named identically:
+  // Bil, SIZE TAYAR, BRAND, MADE IN, NEXEN TDU, GOODYEAR, STORE TMD, TOTAL STOK, HARGA MARKET FOR MEMBERS, HARGA MARKET (NEW CUSTOMER), HARGA SUPPLIER , PROFIT, TOTAL STOK VALUE, TOTAL IF SOLD
+  if (map.size === -1) map.size = 1;
+  if (map.brand === -1) map.brand = 2;
+  if (map.madeIn === -1 && headers.length >= 4) map.madeIn = 3;
+  if (map.nexen === -1) map.nexen = 4;
+  if (map.goodyear === -1) map.goodyear = 5;
+  if (map.storeTmd === -1) map.storeTmd = 6;
+  if (map.totalStock === -1) map.totalStock = 7;
+  if (map.memberPrice === -1) map.memberPrice = 8;
+  if (map.newCustomerPrice === -1) map.newCustomerPrice = 9;
+  if (map.supplierCost === -1) map.supplierCost = 10;
+  if (map.profit === -1) map.profit = 11;
+  if (map.totalStockValue === -1) map.totalStockValue = 12;
+  if (map.totalIfSold === -1) map.totalIfSold = 13;
+
+  return map;
+};
+
+// Parse CSV text to Tire array dynamically synced via header elements
 export const parseCSVTextToTyres = (raw: string): Tire[] => {
   const lines = raw
     .split("\n")
@@ -97,16 +199,31 @@ export const parseCSVTextToTyres = (raw: string): Tire[] => {
   if (lines.length === 0) return [];
 
   let startIdx = 0;
-  const firstLine = lines[0].toUpperCase();
+  const firstLine = lines[0];
+  const firstCols = parseCsvRow(firstLine);
+  const firstLineUpper = firstLine.toUpperCase();
+
   const isHeader =
-    firstLine.includes("SIZE") ||
-    firstLine.includes("BRAND") ||
-    firstLine.includes("HARGA") ||
-    firstLine.includes("TEBAL") ||
-    firstLine.includes("MARKET_PRICE");
+    firstLineUpper.includes("SIZE") ||
+    firstLineUpper.includes("BRAND") ||
+    firstLineUpper.includes("HARGA") ||
+    firstLineUpper.includes("TEBAL") ||
+    firstLineUpper.includes("MADE IN") ||
+    firstLineUpper.includes("BIL") ||
+    firstLineUpper.includes("MARKET");
+
+  let colMap: ColumnMap;
 
   if (isHeader) {
-    startIdx = 1; // Header row
+    colMap = detectColumnMapping(firstCols);
+    startIdx = 1;
+  } else {
+    // If no header found, default to 14-col index structure
+    colMap = detectColumnMapping([
+      "Bil", "SIZE TAYAR", "BRAND", "MADE IN", "NEXEN TDU", "GOODYEAR", "STORE TMD",
+      "TOTAL STOK", "HARGA MARKET FOR MEMBERS", "HARGA MARKET (NEW CUSTOMER)",
+      "HARGA SUPPLIER", "PROFIT", "TOTAL STOK VALUE", "TOTAL IF SOLD"
+    ]);
   }
 
   const tyresList: Tire[] = [];
@@ -115,61 +232,36 @@ export const parseCSVTextToTyres = (raw: string): Tire[] => {
     const cols = parseCsvRow(lines[i]);
     if (cols.length < 3) continue;
 
-    let rawBrandId = "";
-    let rowSeq = i;
-    let rawSize = "";
-    let rawBrandFull = "";
-    let treadDepth = 7.5;
-    let nexenStock = 0;
-    let goodyearStock = 0;
-    let storeStockVal = 0;
-    let totalStockVal = 0;
-    let mktPriceVal = 180;
-    let costPriceVal = 140;
-
-    // Handle user's 15-column template structure:
-    // Index 0: BRAND ID
-    // Index 1: NO
-    // Index 2: SIZE TAYAR
-    // Index 3: BRAND
-    // Index 4: TEBAL - MM
-    // Index 5: NEXEN TDU
-    // Index 6: GOODYEAR
-    // Index 7: STORE TMD
-    // Index 8: TOTAL STOK
-    // Index 9: HARGA MARKET - REGULAR 1
-    // Index 10: HARGA MARKET - NEW 2
-    // Index 11: HARGA STOK (Cost)
-    // Index 12: NEW PROFIT nov 25
-    // Index 13: TOTAL STOK VALUE
-    // Index 14: SOLD VALUE
-    if (cols.length >= 10 && (cols[2].includes(".") || cols[2].includes("/") || cols[2].toUpperCase().includes("R"))) {
-      rawBrandId = cols[0] || "";
-      rowSeq = parseInt(cols[1]) || i;
-      rawSize = cols[2] || "205/55R16";
-      rawBrandFull = cols[3] || "GOODYEAR Standard Series";
-      treadDepth = parseFloat(cols[4]) || 7.5;
-      nexenStock = parseInt(cols[5]) || 0;
-      goodyearStock = parseInt(cols[6]) || 0;
-      storeStockVal = parseInt(cols[7]) || 0;
-      totalStockVal = parseInt(cols[8]) || (storeStockVal + nexenStock + goodyearStock);
-      mktPriceVal = parseFloat((cols[9] || "0").replace(/,/g, "").replace(/"/g, "")) || 0;
-      if (mktPriceVal === 0 && cols[10]) {
-        mktPriceVal = parseFloat((cols[10] || "0").replace(/,/g, "").replace(/"/g, "")) || 0;
-      }
-      costPriceVal = parseFloat((cols[11] || "0").replace(/,/g, "").replace(/"/g, "")) || (mktPriceVal > 0 ? Math.round(mktPriceVal * 0.75) : 100);
-    } else {
-      // Fallback / legacy format detection
-      rawSize = cols[2] || cols[1] || "";
-      rawBrandFull = cols[3] || cols[2] || "BRAND";
-      treadDepth = parseFloat(cols[4]) || 7.5;
-      totalStockVal = parseInt(cols[11] || cols[8] || cols[7] || "10") || 10;
-      storeStockVal = parseInt(cols[10] || cols[7] || String(totalStockVal)) || totalStockVal;
-      nexenStock = parseInt(cols[8] || cols[5]) || 0;
-      goodyearStock = parseInt(cols[9] || cols[6]) || 0;
-      mktPriceVal = parseFloat((cols[12] || cols[9] || "0").replace(/,/g, "").replace(/"/g, "")) || 180;
-      costPriceVal = parseFloat((cols[13] || cols[11] || "0").replace(/,/g, "").replace(/"/g, "")) || 140;
+    const rowSeq = colMap.bil !== -1 && cols[colMap.bil] ? parseInt(cols[colMap.bil], 10) || i : i;
+    const rawSize = (colMap.size !== -1 ? cols[colMap.size] : cols[1]) || "205/55R16";
+    const rawBrandFull = (colMap.brand !== -1 ? cols[colMap.brand] : cols[2]) || "GOODYEAR Standard Series";
+    const rawMadeIn = colMap.madeIn !== -1 && cols[colMap.madeIn] ? cols[colMap.madeIn].trim().toUpperCase() : undefined;
+    const treadDepth = colMap.treadDepth !== -1 && cols[colMap.treadDepth] ? parseCleanNum(cols[colMap.treadDepth], 7.5) : 7.5;
+    
+    const nexenStock = colMap.nexen !== -1 ? parseCleanNum(cols[colMap.nexen], 0) : 0;
+    const goodyearStock = colMap.goodyear !== -1 ? parseCleanNum(cols[colMap.goodyear], 0) : 0;
+    const storeStockVal = colMap.storeTmd !== -1 ? parseCleanNum(cols[colMap.storeTmd], 0) : 0;
+    
+    let totalStockVal = colMap.totalStock !== -1 ? parseCleanNum(cols[colMap.totalStock], 0) : 0;
+    if (totalStockVal === 0 && (storeStockVal > 0 || nexenStock > 0 || goodyearStock > 0)) {
+      totalStockVal = storeStockVal + nexenStock + goodyearStock;
     }
+
+    const memberPriceVal = colMap.memberPrice !== -1 ? parseCleanNum(cols[colMap.memberPrice], 0) : 0;
+    const newCustPriceVal = colMap.newCustomerPrice !== -1 ? parseCleanNum(cols[colMap.newCustomerPrice], 0) : 0;
+    
+    // Determine market price: prefer member or new customer price
+    let mktPriceVal = newCustPriceVal > 0 ? newCustPriceVal : memberPriceVal > 0 ? memberPriceVal : 180;
+    if (mktPriceVal === 0) mktPriceVal = 180;
+
+    let costPriceVal = colMap.supplierCost !== -1 ? parseCleanNum(cols[colMap.supplierCost], 0) : 0;
+    if (costPriceVal === 0 && mktPriceVal > 0) {
+      costPriceVal = Math.round(mktPriceVal * 0.75);
+    }
+
+    let profitVal = colMap.profit !== -1 ? parseCleanNum(cols[colMap.profit], mktPriceVal - costPriceVal) : mktPriceVal - costPriceVal;
+    const totalStkVal = colMap.totalStockValue !== -1 ? parseCleanNum(cols[colMap.totalStockValue], costPriceVal * storeStockVal) : costPriceVal * storeStockVal;
+    const totalSoldVal = colMap.totalIfSold !== -1 ? parseCleanNum(cols[colMap.totalIfSold], mktPriceVal * storeStockVal) : mktPriceVal * storeStockVal;
 
     const { brand: brandName, model: modelName } = extractBrandAndModel(rawBrandFull);
     const formattedSize = normalizeSize(rawSize);
@@ -238,12 +330,9 @@ export const parseCSVTextToTyres = (raw: string): Tire[] => {
 
     // Extract Year if present e.g. 2026, 2025, 2024, 2023, 2021, 2019
     const yearMatch = rawBrandFull.match(/\b(201\d|202\d)\b/);
-    const tireYear = yearMatch ? parseInt(yearMatch[1]) : 2026;
+    const tireYear = yearMatch ? parseInt(yearMatch[1], 10) : 2026;
 
-    let baseId =
-      rawBrandId && rawBrandId.startsWith("BR")
-        ? `${rawBrandId}-${i}`
-        : `SKU-${rowSeq}-${i}-${brandName.slice(0, 3)}-${formattedSize.replace(/[^A-Za-z0-9]/g, "")}-${tireYear}`;
+    const baseId = `SKU-${rowSeq}-${i}-${brandName.slice(0, 3)}-${formattedSize.replace(/[^A-Za-z0-9]/g, "")}-${tireYear}`;
 
     // Ensure strict uniqueness in list
     let tireId = baseId;
@@ -268,19 +357,25 @@ export const parseCSVTextToTyres = (raw: string): Tire[] => {
       speedRating: aspect <= 45 ? "W" : aspect <= 55 ? "V" : "H",
       loadIndex: cat === "Commercial / Van" ? 104 : width >= 225 ? 99 : 91,
       marketPrice: mktPriceVal,
+      memberPrice: memberPriceVal > 0 ? memberPriceVal : mktPriceVal,
+      newCustomerPrice: newCustPriceVal > 0 ? newCustPriceVal : mktPriceVal,
       costPrice: costPriceVal,
-      profit: mktPriceVal - costPriceVal,
+      profit: profitVal,
+      totalStockValue: totalStkVal,
+      totalIfSold: totalSoldVal,
       storeStock: storeStockVal,
       supplierStockNexen: nexenStock,
       supplierStockGoodyear: goodyearStock,
       totalStock: totalStockVal,
       status: totalStockVal <= 0 ? "Out of Stock" : storeStockVal <= 2 ? "Low Stock" : "In Stock",
       year: tireYear,
+      madeIn: rawMadeIn,
+      countryOfOrigin: rawMadeIn,
       wetGripRating: mktPriceVal >= 300 ? "A" : "B",
       noiseLevelDb: aspect <= 45 ? 71 : 68,
       fuelSavingRating: "B",
       treadLifeKm: cat === "Commercial / Van" ? 65000 : 50000,
-      description: `Tayar ${brandName} ${modelName} saiz ${formattedSize} spesifikasi rasmi Lias Tyre.`,
+      description: `Tayar ${brandName} ${modelName} saiz ${formattedSize} spesifikasi rasmi Lias Tyre (${rawMadeIn || "Import"}).`,
       keyTechnologies: ["Sync Auto-Mapped", "TMD Inventory Certified"]
     });
   }

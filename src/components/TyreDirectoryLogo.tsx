@@ -31,29 +31,24 @@ export const TyreDirectoryLogo: React.FC<TyreDirectoryLogoProps> = ({
       </div>
 
       {showText && (
-        <div>
-          <div className="flex items-center gap-1.5 leading-none">
-            <span
-              className={`font-black tracking-tight text-white ${
-                textSize === "lg" ? "text-2xl" : textSize === "md" ? "text-xl" : "text-lg"
-              }`}
-            >
-              LIAS
-            </span>
-            <span
-              className={`font-black tracking-tight text-[#E10600] ${
-                textSize === "lg" ? "text-2xl" : textSize === "md" ? "text-xl" : "text-lg"
-              }`}
-            >
-              TYRE
-            </span>
-            <span className="text-[10px] font-extrabold bg-[#E10600]/20 text-red-300 border border-[#E10600]/40 px-1.5 py-0.5 rounded ml-0.5">
-              PRO
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-            Sistem Pengurusan &amp; Direktori Tayar
-          </p>
+        <div className="flex items-center gap-1.5 leading-none">
+          <span
+            className={`font-black tracking-tight text-white ${
+              textSize === "lg" ? "text-2xl" : textSize === "md" ? "text-xl" : "text-lg"
+            }`}
+          >
+            LIAS
+          </span>
+          <span
+            className={`font-black tracking-tight text-[#E10600] ${
+              textSize === "lg" ? "text-2xl" : textSize === "md" ? "text-xl" : "text-lg"
+            }`}
+          >
+            TYRE
+          </span>
+          <span className="text-[10px] font-extrabold bg-[#E10600]/20 text-red-300 border border-[#E10600]/40 px-1.5 py-0.5 rounded ml-0.5 tracking-wider">
+            PRO
+          </span>
         </div>
       )}
     </div>

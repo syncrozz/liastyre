@@ -138,11 +138,14 @@ export const TireCardShowcase: React.FC<TireCardShowcaseProps> = ({
           : "border-slate-200/90 hover:border-slate-400 hover:border-red-500/30 shadow-sm hover:shadow-xl"
       }`}
     >
-      {/* Top Discount Floating Banner if active */}
+      {/* Reben Merah Diskaun di Bahagian Bawah Kanan (Bottom-Right Red Ribbon) */}
       {priceDetails.hasDiscount && (
-        <div className="absolute -right-12 top-6 bg-gradient-to-r from-red-600 to-rose-600 text-white font-black text-[10px] tracking-wider py-1 px-12 rotate-45 shadow-md z-30 flex items-center justify-center gap-1 uppercase pointer-events-none">
-          <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-          {priceDetails.discountPercent}% OFF
+        <div
+          id={`discount-ribbon-${tire.id}`}
+          className="absolute -right-10 bottom-6 bg-gradient-to-r from-red-600 to-rose-600 text-white font-black text-[10px] tracking-wider py-1 w-36 -rotate-45 shadow-md z-20 flex items-center justify-center gap-1 uppercase pointer-events-none select-none"
+        >
+          <Sparkles className="w-2.5 h-2.5 text-amber-300 shrink-0" />
+          <span>{priceDetails.discountPercent}% OFF</span>
         </div>
       )}
 
